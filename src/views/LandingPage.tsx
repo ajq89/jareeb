@@ -50,26 +50,21 @@ export default function LandingPage() {
     // 1. Listen to vendors
     const qVendors = query(collection(db, 'vendors'));
     const unsubVendors = onSnapshot(qVendors, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor));
+      const list = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Vendor))
+        .filter(v => v.isPublic !== false); // Filter out private vendors
       setDbVendors(list);
     });
 
-    // 2. Listen to products to count them
+    // 2. Listen to products to count them (Products are public)
     const qProducts = query(collection(db, 'products'));
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
       setDbProductCount(snapshot.size);
     });
 
-    // 3. Listen to orders to count them
-    const qOrders = query(collection(db, 'orders'));
-    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
-      setDbOrderCount(snapshot.size);
-    });
-
     return () => {
       unsubVendors();
       unsubProducts();
-      unsubOrders();
     };
   }, []);
 
@@ -332,7 +327,7 @@ export default function LandingPage() {
                           <div className="space-y-4">
                              <div className="flex items-center gap-2">
                                <div className="relative h-8 flex items-center">
-                                 <span className="text-xl font-black text-indigo-600 tracking-tight">jareeb</span>
+                                 <img src="/logo-text.png" alt="Jareeb" className="h-8 w-auto object-contain" />
                                </div>
                                <div>
                                 <h4 className="text-xs font-black text-slate-800">{language === 'ar' ? 'مخبز جريب الفاخر' : 'Jareeb Bakeries'}</h4>
@@ -849,7 +844,7 @@ export default function LandingPage() {
             {/* Branding Column */}
             <div className="md:col-span-5 space-y-4 text-center md:text-left rtl:md:text-right">
               <h2 className="text-3xl font-black text-white tracking-tight flex items-center justify-center md:justify-start">
-                jareeb
+                <img src="/logo-text.png" alt="Jareeb" className="h-10 w-auto object-contain brightness-0 invert" />
               </h2>
               <p className="text-slate-400 font-medium text-xs sm:text-sm leading-relaxed max-w-sm">
                 {language === 'ar' 
@@ -949,6 +944,9 @@ function FeaturedStores() {
   // Re-ordering & Filtering logic to satisfy "re-arrange stores and present beautifully"
   const processedStores = stores
     .filter(store => {
+      // 0. Visibility check
+      if (store.isPublic === false) return false;
+
       // 1. Search term match
       const nameMatch = store.name?.toLowerCase().includes(searchTerm.toLowerCase());
       const descMatch = store.description?.toLowerCase().includes(searchTerm.toLowerCase());

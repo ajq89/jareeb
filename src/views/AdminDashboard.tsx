@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, updateDoc, doc, orderBy, addDoc, where, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { Vendor, SubscriptionPlan } from '../types';
+import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
@@ -24,7 +25,9 @@ import {
   Save,
   Inbox,
   Clock,
-  Phone
+  Phone,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { format } from 'date-fns';
@@ -35,6 +38,21 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPlan, setFilterPlan] = useState<SubscriptionPlan | 'all'>('all');
+
+  // Authorization check
+  const isAdmin = auth.currentUser?.email === 'mursal.bh@gmail.com';
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchVendors();
+      fetchContactSettings();
+      fetchInquiries();
+    }
+  }, [isAdmin]);
+
+  if (!isAdmin) {
+    return <Navigate to="/" />;
+  }
 
   // Tabs layout
   const [activeTab, setActiveTab] = useState<'vendors' | 'contact_settings' | 'inquiries'>('vendors');
@@ -50,12 +68,6 @@ export default function AdminDashboard() {
   // User Inquiries state
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [loadingInquiries, setLoadingInquiries] = useState(false);
-
-  useEffect(() => {
-    fetchVendors();
-    fetchContactSettings();
-    fetchInquiries();
-  }, []);
 
   const fetchContactSettings = async () => {
     try {
@@ -182,6 +194,19 @@ export default function AdminDashboard() {
         console.error('Background upgrade failed:', fallbackError);
         alert(language === 'ar' ? 'فشل تحديث الباقة: صلاحيات غير كافية' : 'Failed to update plan: Insufficient permissions');
       }
+    }
+  };
+
+  const toggleVendorVisibility = async (vendorId: string, currentStatus: boolean) => {
+    try {
+      const vendorRef = doc(db, 'vendors', vendorId);
+      await updateDoc(vendorRef, { 
+        isPublic: !currentStatus
+      });
+      setVendors(vendors.map(v => v.id === vendorId ? { ...v, isPublic: !currentStatus } : v));
+    } catch (error) {
+      console.error('Error toggling visibility:', error);
+      alert(language === 'ar' ? 'فشل تغيير حالة الظهور' : 'Failed to toggle visibility');
     }
   };
 
@@ -405,6 +430,21 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="flex items-center gap-2 rtl:flex-row-reverse">
+                        <button
+                          onClick={() => toggleVendorVisibility(vendor.id, vendor.isPublic !== false)}
+                          className={`p-3 rounded-2xl transition-all flex items-center gap-2 ${
+                            vendor.isPublic !== false 
+                            ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100' 
+                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-slate-200'
+                          }`}
+                          title={vendor.isPublic !== false ? (language === 'ar' ? 'إخفاء من الرئيسية' : 'Hide from Home') : (language === 'ar' ? 'إظهار في الرئيسية' : 'Show on Home')}
+                        >
+                          {vendor.isPublic !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+                            {vendor.isPublic !== false ? (language === 'ar' ? 'منشور' : 'Public') : (language === 'ar' ? 'مخفي' : 'Private')}
+                          </span>
+                        </button>
+
                         {(['starter', 'pro', 'enterprise'] as SubscriptionPlan[]).map(p => (
                           <button
                             key={p}

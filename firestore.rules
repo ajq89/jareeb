@@ -1,8 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'mursal.bh@gmail.com';
+    }
+
+    // Helper function to check if the user is the owner of a vendor profile
+    function isVendorOwner(vendorId) {
+      return request.auth != null && 
+        (get(/databases/$(database)/documents/vendors/$(vendorId)).data.uid == request.auth.uid || isAdmin());
+    }
+
+    // Vendors: Read by anyone, Create by authenticated users, Update/Delete by owner or admin
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Products: Read by anyone, Write by vendor owner or admin
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if request.auth != null && isVendorOwner(request.resource.data.vendorId);
+      allow update: if request.auth != null && isVendorOwner(resource.data.vendorId);
+      allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendorId));
+    }
+
+    // Orders: Create by anyone, Read/Update by vendor owner or admin
+    match /orders/{orderId} {
+      allow create: if true;
+      allow get: if true; // Allow guests to track via ID
+      allow list: if isAdmin() || isVendorOwner(resource.data.vendorId);
+      allow update: if isAdmin() || isVendorOwner(resource.data.vendorId) || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'onMyWay', 'carDetails']));
+      allow delete: if isAdmin() || isVendorOwner(resource.data.vendorId);
+    }
+
+    // Customers: Read/Write by vendor owner or admin
+    match /customers/{customerId} {
+      allow read: if isAdmin() || isVendorOwner(resource.data.vendorId);
+      allow write: if isAdmin() || isVendorOwner(request.resource.data.vendorId || resource.data.vendorId);
+    }
+
+    // Settings: Read by anyone, Write by admin only
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Inquiries: Create by anyone, Read/Write by admin only
+    match /inquiries/{inquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
   }
 }

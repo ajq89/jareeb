@@ -23,6 +23,7 @@ import TermsOfService from './views/TermsOfService';
 import ContactPage from './views/ContactPage';
 import Navbar from './components/Navbar';
 import SplashScreen from './components/SplashScreen';
+import SwipeNavigation from './components/SwipeNavigation';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -58,6 +59,7 @@ export default function App() {
       
       {!loading && (
         <BrowserRouter>
+          <SwipeNavigation />
           <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
             <Navbar user={user} />
             <main>
@@ -72,7 +74,10 @@ export default function App() {
                   />
                   <Route path="/store/:slug" element={<Storefront />} />
                   <Route path="/track/:orderId" element={<TrackingPage />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route 
+                    path="/admin" 
+                    element={user?.email === 'mursal.bh@gmail.com' ? <AdminDashboard /> : <Navigate to="/" />} 
+                  />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/contact" element={<ContactPage />} />

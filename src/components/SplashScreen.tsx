@@ -37,7 +37,7 @@ export default function SplashScreen() {
           <img 
             src="/splash-logo.png" 
             alt="Jareeb" 
-            className="w-48 sm:w-64 h-auto object-contain drop-shadow-sm"
+            className="w-48 sm:w-64 h-auto object-contain drop-shadow-2xl brightness-105"
           />
         </motion.div>
 

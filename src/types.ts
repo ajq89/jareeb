@@ -34,6 +34,7 @@ export interface Vendor {
   bankAccountName?: string;
   ownerName?: string;
   isClosedByUser?: boolean;
+  isPublic?: boolean;
   customDomain?: string;
 }
 

@@ -56,7 +56,7 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="text-center mb-10">
           <Link to="/" className="inline-flex items-center mb-4 group">
-            <span className="text-4xl font-black text-indigo-600 tracking-tighter group-hover:scale-105 transition-transform duration-300">jareeb</span>
+            <img src="/logo-text.png" alt="Jareeb" className="h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
           </Link>
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
             {language === 'ar' ? 'بوابة التجار المبدعين' : 'Creative Vendor Portal'}

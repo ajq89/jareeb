@@ -9,7 +9,7 @@ import { collection, query, where, onSnapshot, doc, getDoc, setDoc, addDoc, upda
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Vendor, Product, Order, OrderStatus, ProductCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock } from 'lucide-react';
+import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../lib/i18n';
 import CustomersPanel from '../components/CustomersPanel';
@@ -1920,7 +1920,8 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
     logoUrl: vendor.logoUrl || '',
     bannerUrl: vendor.bannerUrl || '',
     iban: vendor.iban || '',
-    customDomain: vendor.customDomain || ''
+    customDomain: vendor.customDomain || '',
+    isPublic: vendor.isPublic !== false
   });
   const [saving, setSaving] = useState(false);
   const [isEditingIban, setIsEditingIban] = useState(false);
@@ -2079,7 +2080,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               />
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الوصف' : 'Description'}</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'وصف المتجر' : 'Store Description'}</label>
               <textarea 
                 rows={3}
                 value={formData.description} 
@@ -2087,6 +2088,28 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 className="w-full px-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-right rtl:text-right"
                 placeholder={language === 'ar' ? 'أخبر عملائك عن متجرك...' : 'Tell customers about your store...'}
               />
+            </div>
+            
+            {/* Visibility Toggle */}
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 rtl:flex-row-reverse">
+                <div className="flex items-center gap-3 rtl:flex-row-reverse">
+                  <div className={`p-2 rounded-xl ${formData.isPublic ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                    {formData.isPublic ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-800">{language === 'ar' ? 'ظهور المتجر' : 'Store Visibility'}</p>
+                    <p className="text-[10px] text-slate-500 font-medium">{formData.isPublic ? (language === 'ar' ? 'متجرك معروض حالياً في الصفحة الرئيسية' : 'Your store is currently visible on the home page') : (language === 'ar' ? 'متجرك مخفي من الصفحة الرئيسية' : 'Your store is hidden from the home page')}</p>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, isPublic: !formData.isPublic})}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.isPublic ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isPublic ? (isRTL ? '-translate-x-6' : 'translate-x-6') : (isRTL ? '-translate-x-1' : 'translate-x-1')}`} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
