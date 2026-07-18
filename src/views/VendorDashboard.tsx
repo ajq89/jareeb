@@ -1165,6 +1165,44 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const compressAndResizeImage = (file: File, maxDimension: number = 1000, quality: number = 0.7): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height *= maxDimension / width;
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width *= maxDimension / height;
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleLocalImageUpload = async (file: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -1174,13 +1212,7 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     setIsUploadingImage(true);
     setUploadError('');
     try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (err) => reject(err);
-      });
-      const base64Str = await base64Promise;
+      const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
       const res = await fetch('/api/upload-image', {
         method: 'POST',

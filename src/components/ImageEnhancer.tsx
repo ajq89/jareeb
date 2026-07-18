@@ -142,12 +142,41 @@ export default function ImageEnhancer({
     }
   };
 
-  const convertToBase64 = (file: File): Promise<string> => {
+  const compressAndResizeImage = (file: File, maxDimension: number = 1000, quality: number = 0.7): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height *= maxDimension / width;
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width *= maxDimension / height;
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = (err) => reject(err);
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -162,7 +191,7 @@ export default function ImageEnhancer({
     setIsUploading(true);
 
     try {
-      const base64Str = await convertToBase64(file);
+      const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       const res = await fetch("/api/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
