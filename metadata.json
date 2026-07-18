@@ -1,0 +1,6 @@
+{
+  "name": "Jareeb",
+  "description": "A specialized curbside pickup platform for home-based businesses in the GCC region, featuring real-time vendor alerts and order tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

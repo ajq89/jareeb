@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "Vendor": {
+      "title": "Vendor",
+      "description": "A merchant providing curbside pickup services",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID of the owner" },
+        "name": { "type": "string", "maxLength": 100 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "iban": { "type": "string", "pattern": "^[A-Z0-9 ]+$" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "slug", "iban", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "An item sold by a vendor",
+      "type": "object",
+      "properties": {
+        "vendorId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "price": { "type": "number", "minimum": 0 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "imageUrl": { "type": "string" },
+        "addons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" }
+            }
+          }
+        },
+        "sizes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "label": { "type": "string", "enum": ["S", "M", "L", "XL"] }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["vendorId", "name", "price", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A purchase request from a customer",
+      "type": "object",
+      "properties": {
+        "vendorId": { "type": "string" },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string" },
+        "pickupTime": { "type": "string", "format": "date-time" },
+        "items": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "number" },
+              "selectedAddons": { "type": "array" },
+              "selectedSize": { "type": "object" }
+            }
+          }
+        },
+        "total": { "type": "number" },
+        "status": { 
+          "type": "string", 
+          "enum": ["pending", "processing", "ready", "arrived", "completed"] 
+        },
+        "onMyWay": { "type": "boolean" },
+        "carDetails": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "color": { "type": "string" },
+            "plate": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["vendorId", "customerName", "customerPhone", "pickupTime", "items", "total", "status", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer of a vendor, stored for marketing and relationship tracking",
+      "type": "object",
+      "properties": {
+        "vendorId": { "type": "string", "description": "The vendor this customer belongs to" },
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "description": "Customer phone number" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["vendorId", "name", "phone", "createdAt"]
+    },
+    "ContactSettings": {
+      "title": "ContactSettings",
+      "description": "Global settings for platform contact channels",
+      "type": "object",
+      "properties": {
+        "supportEmail": { "type": "string" },
+        "salesEmail": { "type": "string" },
+        "supportWhatsapp": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["supportEmail", "salesEmail", "supportWhatsapp", "instagramUrl"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "An inquiry or feedback sent by a platform visitor",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string" },
+        "message": { "type": "string", "maxLength": 5000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["unread", "read"] }
+      },
+      "required": ["name", "email", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/vendors/{vendorId}": {
+      "schema": "Vendor",
+      "description": "Collection of all vendors"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all products"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of all customer orders"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Collection of vendor customers"
+    },
+    "/settings/{settingId}": {
+      "schema": "ContactSettings",
+      "description": "Collection of global platform settings"
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Collection of platform inquiries"
+    }
+  }
+}
