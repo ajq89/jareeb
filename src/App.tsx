@@ -22,57 +22,66 @@ import PrivacyPolicy from './views/PrivacyPolicy';
 import TermsOfService from './views/TermsOfService';
 import ContactPage from './views/ContactPage';
 import Navbar from './components/Navbar';
+import SplashScreen from './components/SplashScreen';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    // Minimum 2 seconds to show the splash screen
+    const minSplashTime = 2000;
+    const startTime = Date.now();
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      setLoading(false);
+      
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, minSplashTime - elapsedTime);
+
+      // Transition precisely after the minimum time
+      setTimeout(() => {
+        setLoading(false);
+        // Start fading out the splash screen
+        setShowSplash(false);
+      }, remainingTime);
     });
     return unsubscribe;
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
-
   return (
     <LanguageProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
-          <Navbar user={user} />
-          <main>
-            <AnimatePresence mode="wait">
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <RegisterPage />} />
-                <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
-                <Route 
-                  path="/dashboard" 
-                  element={user ? <VendorDashboard user={user} /> : <Navigate to="/login" />} 
-                />
-                <Route path="/store/:slug" element={<Storefront />} />
-                <Route path="/track/:orderId" element={<TrackingPage />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/contact" element={<ContactPage />} />
-              </Routes>
-            </AnimatePresence>
-          </main>
-        </div>
-      </BrowserRouter>
+      <AnimatePresence>
+        {showSplash && <SplashScreen key="splash" />}
+      </AnimatePresence>
+      
+      {!loading && (
+        <BrowserRouter>
+          <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
+            <Navbar user={user} />
+            <main>
+              <AnimatePresence mode="wait">
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <RegisterPage />} />
+                  <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+                  <Route 
+                    path="/dashboard" 
+                    element={user ? <VendorDashboard user={user} /> : <Navigate to="/login" />} 
+                  />
+                  <Route path="/store/:slug" element={<Storefront />} />
+                  <Route path="/track/:orderId" element={<TrackingPage />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                </Routes>
+              </AnimatePresence>
+            </main>
+          </div>
+        </BrowserRouter>
+      )}
     </LanguageProvider>
   );
 }

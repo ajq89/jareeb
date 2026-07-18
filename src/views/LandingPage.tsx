@@ -330,9 +330,11 @@ export default function LandingPage() {
                           className="flex-1 flex flex-col justify-between"
                         >
                           <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                              <img src="/logo.png" alt="Jareeb" className="w-8 h-8 object-contain rounded-xl" />
-                              <div>
+                             <div className="flex items-center gap-2">
+                               <div className="relative h-8 flex items-center">
+                                 <span className="text-xl font-black text-indigo-600 tracking-tight">jareeb</span>
+                               </div>
+                               <div>
                                 <h4 className="text-xs font-black text-slate-800">{language === 'ar' ? 'مخبز جريب الفاخر' : 'Jareeb Bakeries'}</h4>
                                 <p className="text-[9px] text-slate-400 font-bold">{language === 'ar' ? 'المنامة، البحرين' : 'Manama, Bahrain'}</p>
                               </div>
@@ -847,7 +849,7 @@ export default function LandingPage() {
             {/* Branding Column */}
             <div className="md:col-span-5 space-y-4 text-center md:text-left rtl:md:text-right">
               <h2 className="text-3xl font-black text-white tracking-tight flex items-center justify-center md:justify-start">
-                <img src="/logo.png" alt="Jareeb" className="h-10 w-auto object-contain" />
+                jareeb
               </h2>
               <p className="text-slate-400 font-medium text-xs sm:text-sm leading-relaxed max-w-sm">
                 {language === 'ar' 

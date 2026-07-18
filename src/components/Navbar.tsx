@@ -34,9 +34,19 @@ export default function Navbar({ user }: NavbarProps) {
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center min-w-0">
             <Link to="/" className="flex items-center group">
-              <img src="/logo.png" alt="Jareeb" className="h-10 w-auto object-contain transition-transform group-hover:scale-105" />
+              <img 
+                src="/logo-text.png" 
+                alt="Jareeb" 
+                className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.logo-fallback');
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
+              />
+              <span className="logo-fallback hidden text-xl sm:text-2xl font-black text-indigo-600 tracking-tight group-hover:scale-105 transition-transform">jareeb</span>
             </Link>
           </div>
 
