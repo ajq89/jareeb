@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Vendor, Product, Order, OrderStatus, ProductCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
@@ -52,6 +53,21 @@ export default function VendorDashboard({ user }: DashboardProps) {
   useEffect(() => {
     soundEnabledRef.current = soundEnabled;
   }, [soundEnabled]);
+
+  useEffect(() => {
+    if (vendor && vendor.uid && vendor.id) {
+      // Auto-upgrade admin to pro for testing
+      if (vendor.ownerName === 'Mursal' || auth.currentUser?.email === 'mursal.bh@gmail.com') {
+        if (vendor.plan !== 'pro' && vendor.plan !== 'enterprise') {
+           updateDoc(doc(db, 'vendors', vendor.id), { 
+             plan: 'pro', 
+             aiCredits: 100,
+             subscriptionStatus: 'active'
+           });
+        }
+      }
+    }
+  }, [vendor]);
 
   const playNotificationChime = () => {
     if (!soundEnabledRef.current) return;
@@ -659,14 +675,12 @@ export default function VendorDashboard({ user }: DashboardProps) {
             >
               {language === 'ar' ? 'نسخ' : 'Copy'}
             </button>
-            <a 
-              href={`/store/${resolvedVendor.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link 
+              to={`/store/${resolvedVendor.slug}`}
               className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold transition-colors text-center"
             >
               {language === 'ar' ? 'عرض مباشر' : 'View Live'}
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -1217,7 +1231,7 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
       const res = await fetch('/api/upload-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Str })
+        body: JSON.stringify({ image: base64Str, vendorId })
       });
       if (!res.ok) {
         throw new Error(language === 'ar' ? 'فشل رفع الصورة للخادم.' : 'Server failed to process file upload.');
@@ -1249,6 +1263,8 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     addons: { id: string; name: string; price: number }[];
     sizes: { id: string; name: string; price: number; label: string }[];
     stock: number;
+    madeToOrder: boolean;
+    prepTime: string;
   }>({ 
     name: '', 
     price: 0, 
@@ -1261,7 +1277,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     expiryDate: '',
     addons: [], 
     sizes: [],
-    stock: 0
+    stock: 0,
+    madeToOrder: false,
+    prepTime: ''
   });
 
   const getLabelOptions = (category: ProductCategory) => {
@@ -1286,7 +1304,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
       expiryDate: '',
       addons: [], 
       sizes: [],
-      stock: 0
+      stock: 0,
+      madeToOrder: false,
+      prepTime: ''
     });
     setShowAdd(false);
     setEditingId(null);
@@ -1325,7 +1345,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
       expiryDate: product.expiryDate || '',
       addons: product.addons || [],
       sizes: product.sizes || [],
-      stock: product.stock || 0
+      stock: product.stock || 0,
+      madeToOrder: product.madeToOrder || false,
+      prepTime: product.prepTime || ''
     });
     setEditingId(product.id);
     setShowAdd(true);
@@ -1424,6 +1446,39 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white font-bold text-right rtl:text-right"
                   placeholder="0"
                 />
+                <p className="text-[10px] text-slate-400 mt-1 font-bold rtl:text-right">
+                  {language === 'ar' ? 'اكتب 0 لتكون الكمية غير محدودة (متاحة دائماً)، أو اكتب عدداً سالباً (مثال: -1) لتعطيل المنتج ونفاذ المخزون.' : 'Enter 0 for unlimited stock (always available), or a negative number (e.g. -1) to mark as out of stock.'}
+                </p>
+              </div>
+
+              {/* Made to Order Section */}
+              <div className="md:col-span-2 p-6 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 space-y-4">
+                <div className="flex items-center justify-between rtl:flex-row-reverse">
+                  <div className="space-y-0.5">
+                    <label className="block text-sm font-black text-slate-800">{language === 'ar' ? 'تنفيذ عند الطلب (طلب مسبق)' : 'Made to Order (Pre-order)'}</label>
+                    <p className="text-[10px] text-slate-500 font-bold">{language === 'ar' ? 'فعل هذا الخيار للمنتجات التي تتطلب وقتاً للتجهيز مثل الكيك أو المشغولات اليدوية' : 'Enable for products that require prep time like cakes or handmade crafts'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewData({ ...newData, madeToOrder: !newData.madeToOrder })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${newData.madeToOrder ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newData.madeToOrder ? (language === 'ar' ? '-translate-x-6' : 'translate-x-6') : (language === 'ar' ? '-translate-x-1' : 'translate-x-1')}`} />
+                  </button>
+                </div>
+                
+                {newData.madeToOrder && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-2">
+                    <label className="block text-xs font-black text-slate-400 uppercase mb-2">{language === 'ar' ? 'مدة التجهيز المتوقعة' : 'Estimated Preparation Time'}</label>
+                    <input 
+                      type="text" 
+                      value={newData.prepTime} 
+                      onChange={e => setNewData({...newData, prepTime: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:border-indigo-500 bg-white font-bold text-right rtl:text-right"
+                      placeholder={language === 'ar' ? 'مثلاً: 24 ساعة، يومين' : 'e.g. 24 hours, 2 days'}
+                    />
+                  </motion.div>
+                )}
               </div>
 
               {/* Category Specific Fields */}
@@ -1884,9 +1939,12 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                   <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
                     p.stock > 10 ? 'bg-indigo-50 text-indigo-600' : 
                     p.stock > 0 ? 'bg-amber-100 text-amber-600' : 
+                    p.stock === 0 ? 'bg-emerald-50 text-emerald-600' :
                     'bg-rose-100 text-rose-600'
                   }`}>
-                    {p.stock > 0 ? (language === 'ar' ? `في المخزن: ${p.stock}` : `In Stock: ${p.stock}`) : (language === 'ar' ? 'نفذ المخزون' : 'Out of Stock')}
+                    {p.stock > 0 ? (language === 'ar' ? `في المخزن: ${p.stock}` : `In Stock: ${p.stock}`) : 
+                     p.stock === 0 ? (language === 'ar' ? 'كمية لا تنتهي' : 'Unlimited Stock') :
+                     (language === 'ar' ? 'نفذ المخزون' : 'Out of Stock')}
                   </span>
                 )}
               </div>
@@ -1898,6 +1956,12 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                 {p.volume && <span className="px-2 py-0.5 bg-slate-50 text-slate-400 text-[10px] font-black rounded border border-slate-100">{p.volume}</span>}
                 {p.calories && <span className="px-2 py-0.5 bg-slate-50 text-slate-400 text-[10px] font-black rounded border border-slate-100">{p.calories} kcal</span>}
                 {p.weight && <span className="px-2 py-0.5 bg-slate-50 text-slate-400 text-[10px] font-black rounded border border-slate-100">{p.weight}</span>}
+                {p.madeToOrder && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] font-black rounded border border-purple-100">
+                    <Clock className="w-3 h-3" />
+                    {language === 'ar' ? `تجهيز: ${p.prepTime}` : `Prep: ${p.prepTime}`}
+                  </span>
+                )}
               </div>
               <p className="text-slate-400 text-xs font-medium line-clamp-2 mt-1">{p.description}</p>
             </div>
@@ -1953,18 +2017,28 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
     bannerUrl: vendor.bannerUrl || '',
     iban: vendor.iban || '',
     customDomain: vendor.customDomain || '',
-    isPublic: vendor.isPublic !== false
+    isPublic: vendor.isPublic !== false,
+    mapUrl: vendor.mapUrl || '',
+    buildingNo: vendor.buildingNo || '',
+    roadNo: vendor.roadNo || '',
+    blockNo: vendor.blockNo || '',
+    city: vendor.city || ''
   });
   const [saving, setSaving] = useState(false);
   const [isEditingIban, setIsEditingIban] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (type === 'logo') setIsUploadingLogo(true);
+      else setIsUploadingBanner(true);
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
@@ -1990,8 +2064,25 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
 
           // Compress to JPEG with 0.6 quality
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
-          else setFormData(prev => ({ ...prev, bannerUrl: dataUrl }));
+          try {
+            const res = await fetch('/api/upload-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: dataUrl, vendorId: vendor.id })
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: data.imageUrl }));
+            else setFormData(prev => ({ ...prev, bannerUrl: data.imageUrl }));
+          } catch (err) {
+            console.error('Failed to upload settings image to Firebase Storage', err);
+            // Fallback to local base64 if upload fails completely
+            if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
+            else setFormData(prev => ({ ...prev, bannerUrl: dataUrl }));
+          } finally {
+            if (type === 'logo') setIsUploadingLogo(false);
+            else setIsUploadingBanner(false);
+          }
         };
         img.src = event.target?.result as string;
       };
@@ -2045,7 +2136,11 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{language === 'ar' ? 'شعار المتجر' : 'Store Logo'}</p>
                 <div className="relative group">
                   <div className="w-32 h-32 rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
-                    {formData.logoUrl ? (
+                    {isUploadingLogo ? (
+                      <div className="flex flex-col items-center justify-center p-2">
+                        <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    ) : formData.logoUrl ? (
                       <img src={formData.logoUrl} className="w-full h-full object-cover" alt="Logo" />
                     ) : (
                       <Plus className="w-8 h-8 text-slate-300" />
@@ -2056,10 +2151,13 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                     accept="image/*" 
                     onChange={e => handleImageUpload(e, 'logo')}
                     className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    disabled={isUploadingLogo}
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] flex items-center justify-center text-white text-xs font-black pointer-events-none">
-                    {language === 'ar' ? 'تغيير الشعار' : 'Change Logo'}
-                  </div>
+                  {!isUploadingLogo && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] flex items-center justify-center text-white text-xs font-black pointer-events-none">
+                      {language === 'ar' ? 'تغيير الشعار' : 'Change Logo'}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2068,7 +2166,12 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{language === 'ar' ? 'غلاف المتجر' : 'Store Banner'}</p>
                 <div className="relative group h-32 w-full">
                   <div className="w-full h-full rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
-                    {formData.bannerUrl ? (
+                    {isUploadingBanner ? (
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-[10px] font-bold text-indigo-600">{language === 'ar' ? 'جاري الرفع...' : 'Uploading...'}</span>
+                      </div>
+                    ) : formData.bannerUrl ? (
                       <img src={formData.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
                     ) : (
                       <div className="flex flex-col items-center gap-2">
@@ -2082,8 +2185,9 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                     accept="image/*" 
                     onChange={e => handleImageUpload(e, 'banner')}
                     className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    disabled={isUploadingBanner}
                   />
-                  {formData.bannerUrl && (
+                  {formData.bannerUrl && !isUploadingBanner && (
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl flex items-center justify-center text-white text-xs font-black pointer-events-none">
                       {language === 'ar' ? 'تغيير الغلاف' : 'Change Banner'}
                     </div>
@@ -2163,7 +2267,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                   value={formData.phone} 
                   onChange={e => setFormData({...formData, phone: e.target.value})}
                   className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right"
-                  placeholder="e.g. +973 30000000"
+                  placeholder="e.g. +973 36368522"
                 />
               </div>
             </div>
@@ -2182,7 +2286,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الموقع / العنوان' : 'Location / Address'}</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'اسم المنطقة / العنوان العام' : 'General Area / Mall / Complex'}</label>
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
                 <MapPin className="w-4 h-4 text-slate-400" />
                 <input 
@@ -2193,6 +2297,69 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                   placeholder="e.g. Seef Mall, Manama"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'رابط الموقع على قوقل ماب' : 'Google Maps Location Link'}</label>
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
+                <Globe className="w-4 h-4 text-slate-400" />
+                <input 
+                  type="url" 
+                  value={formData.mapUrl} 
+                  onChange={e => setFormData({...formData, mapUrl: e.target.value})}
+                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right font-mono text-xs"
+                  placeholder="https://maps.app.goo.gl/..."
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 font-bold rtl:text-right">
+                {language === 'ar' 
+                  ? 'شارك موقع متجرك من تطبيق قوقل ماب والصق الرابط هنا ليسهل على الزبون الوصول' 
+                  : 'Share your store location on Google Maps and paste the link here for customers to navigate'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 md:col-span-2">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'المبنى / البيت / المحل' : 'Building / Shop'}</label>
+                <input 
+                  type="text" 
+                  value={formData.buildingNo} 
+                  onChange={e => setFormData({...formData, buildingNo: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  placeholder="e.g. 124"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الطريق / الشارع' : 'Road / Street'}</label>
+                <input 
+                  type="text" 
+                  value={formData.roadNo} 
+                  onChange={e => setFormData({...formData, roadNo: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  placeholder="e.g. 2804"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'المجمع' : 'Block'}</label>
+                <input 
+                  type="text" 
+                  value={formData.blockNo} 
+                  onChange={e => setFormData({...formData, blockNo: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  placeholder="e.g. 428"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'المنطقة / المدينة' : 'City / Area'}</label>
+              <input 
+                type="text" 
+                value={formData.city} 
+                onChange={e => setFormData({...formData, city: e.target.value})}
+                className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-right rtl:text-right"
+                placeholder={language === 'ar' ? 'المنامة، ضاحية السيف' : 'Seef, Manama'}
+              />
             </div>
           </div>
         </div>

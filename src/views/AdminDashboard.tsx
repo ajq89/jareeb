@@ -60,7 +60,7 @@ export default function AdminDashboard() {
   // Contact settings state
   const [supportEmail, setSupportEmail] = useState('support@jareeb.com');
   const [salesEmail, setSalesEmail] = useState('sales@jareeb.com');
-  const [supportWhatsapp, setSupportWhatsapp] = useState('+97330000000');
+  const [supportWhatsapp, setSupportWhatsapp] = useState('+97336368522');
   const [instagramUrl, setInstagramUrl] = useState('https://instagram.com/jareeb.bh');
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
@@ -555,7 +555,7 @@ export default function AdminDashboard() {
                       required
                       value={supportWhatsapp}
                       onChange={e => setSupportWhatsapp(e.target.value)}
-                      placeholder="e.g. +97330000000"
+                      placeholder="e.g. +97336368522"
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition-all font-semibold text-sm text-left"
                     />
                   </div>

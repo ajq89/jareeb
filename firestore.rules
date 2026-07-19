@@ -25,7 +25,8 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow create: if request.auth != null && isVendorOwner(request.resource.data.vendorId);
-      allow update: if request.auth != null && isVendorOwner(resource.data.vendorId);
+      allow update: if (request.auth != null && isVendorOwner(resource.data.vendorId)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
       allow delete: if isAdmin() || (request.auth != null && isVendorOwner(resource.data.vendorId));
     }
 

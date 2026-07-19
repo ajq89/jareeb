@@ -69,22 +69,22 @@ export default function RegisterPage() {
   const steps = [
     {
       title: language === 'ar' ? 'بيانات حسابك' : 'Account Details',
-      subtitle: language === 'ar' ? 'هذي البيانات تستخدمينها لتسجيل الدخول لاحقًا' : 'These details will be used to log in later',
+      subtitle: language === 'ar' ? 'هذي البيانات تستخدم لتسجيل الدخول لاحقًا' : 'These details will be used to log in later',
       icon: <UserIcon className="w-5 h-5" />
     },
     {
       title: language === 'ar' ? 'بيانات متجرك' : 'Store Details',
-      subtitle: language === 'ar' ? 'هذي المعلومات تظهر للزبونات في متجرك' : 'This information will be visible to your customers',
+      subtitle: language === 'ar' ? 'هذي المعلومات تظهر للزبائن في متجرك' : 'This information will be visible to your customers',
       icon: <StoreIcon className="w-5 h-5" />
     },
     {
       title: language === 'ar' ? 'عنوان الاستلام' : 'Pickup Address',
-      subtitle: language === 'ar' ? 'تظهر هذي البيانات للزبونة بعد تأكيد الطلب فقط' : 'This data is only shown to the customer after order confirmation',
+      subtitle: language === 'ar' ? 'تظهر هذي البيانات للزبون بعد تأكيد الطلب فقط' : 'This data is only shown to the customer after order confirmation',
       icon: <MapPin className="w-5 h-5" />
     },
     {
       title: language === 'ar' ? 'بيانات التحويل البنكي' : 'Bank Transfer Details',
-      subtitle: language === 'ar' ? 'تُعرض للزبونة عند تأكيد الطلب لإتمام الدفع عبر التحويل اليدوي' : 'Displayed to the customer for manual bank transfer payment',
+      subtitle: language === 'ar' ? 'تُعرض للزبون عند تأكيد الطلب لإتمام الدفع عبر التحويل اليدوي' : 'Displayed to the customer for manual bank transfer payment',
       icon: <CreditCard className="w-5 h-5" />
     },
     {
@@ -282,9 +282,10 @@ export default function RegisterPage() {
         pickupDetails: pickupData.details,
         bankAccountName: bankData.accountName,
         bankName: bankData.bankName,
-        plan: 'starter',
-        subscriptionStatus: 'trial',
-        subscriptionEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days trial
+        plan: accountData.email === 'mursal.bh@gmail.com' ? 'pro' : 'starter',
+        subscriptionStatus: 'active',
+        aiCredits: accountData.email === 'mursal.bh@gmail.com' ? 100 : 10,
+        subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: new Date().toISOString()
       });
 

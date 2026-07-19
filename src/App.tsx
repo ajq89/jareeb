@@ -31,8 +31,8 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Minimum 2 seconds to show the splash screen
-    const minSplashTime = 2000;
+    // Minimum 0.8 seconds to show the splash screen
+    const minSplashTime = 800;
     const startTime = Date.now();
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {

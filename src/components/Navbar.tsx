@@ -35,12 +35,14 @@ export default function Navbar({ user }: NavbarProps) {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center min-w-0">
-            <Link to="/" className="flex items-center group transition-opacity hover:opacity-90">
-              <img 
-                src="/logo-text.png" 
-                alt="Jareeb" 
-                className="h-10 sm:h-12 w-auto object-contain transition-all duration-500 group-hover:scale-105"
-              />
+            <Link to="/" className="flex flex-col items-center sm:items-start group transition-all hover:scale-105 active:scale-95">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter uppercase">Jareeb</span>
+                <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse mt-2" />
+              </div>
+              <span className="text-[8px] sm:text-[10px] font-black text-slate-400 -mt-1 tracking-wider uppercase">
+                من بيتهم ... الى سيارتك
+              </span>
             </Link>
           </div>
 

@@ -195,7 +195,7 @@ export default function ImageEnhancer({
       const res = await fetch("/api/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64Str })
+        body: JSON.stringify({ image: base64Str, vendorId })
       });
 
       if (!res.ok) {

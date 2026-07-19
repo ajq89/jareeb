@@ -28,6 +28,7 @@ export default function Storefront() {
   }[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Addon & Size selection state
@@ -45,14 +46,18 @@ export default function Storefront() {
   });
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [receiptUploadError, setReceiptUploadError] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsUploadingReceipt(true);
+      setReceiptUploadError('');
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
@@ -78,7 +83,23 @@ export default function Storefront() {
 
           // Compress to JPEG with 0.6 quality - significant reduction
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          setReceiptImage(dataUrl);
+          try {
+            const res = await fetch('/api/upload-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: dataUrl, vendorId: vendor?.id })
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            setReceiptImage(data.imageUrl);
+          } catch (err) {
+            console.error('Failed to upload receipt image to Firebase Storage', err);
+            // Fallback to local base64 if upload fails completely
+            setReceiptImage(dataUrl);
+            setReceiptUploadError(language === 'ar' ? 'فشل الرفع للمخدم، تم استخدام الصورة محلياً.' : 'Upload failed, image stored locally.');
+          } finally {
+            setIsUploadingReceipt(false);
+          }
         };
         img.src = event.target?.result as string;
       };
@@ -94,12 +115,15 @@ export default function Storefront() {
         
         if (vSnap.empty) {
           setError('Store not found');
+          setLoading(false);
           return;
         }
 
         const vData = { id: vSnap.docs[0].id, ...vSnap.docs[0].data() } as Vendor;
         setVendor(vData);
+        setLoading(false); // Render vendor info immediately
 
+        // Fetch products
         const pq = query(collection(db, 'products'), where('vendorId', '==', vData.id));
         const pSnap = await getDocs(pq);
         setProducts(pSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Product));
@@ -107,7 +131,7 @@ export default function Storefront() {
         handleFirestoreError(error, OperationType.LIST, `store/${slug}`);
         setError('Failed to load store');
       } finally {
-        setLoading(false);
+        setProductsLoading(false);
       }
     };
 
@@ -175,10 +199,7 @@ export default function Storefront() {
     setIsSubmitting(true);
 
     try {
-      // 1. First verify stock is still available (simple check)
-      // Note: In a production app, this should be done in a transaction
-      
-      // 2. Create the order
+      // 1. Create the order
       const orderRef = await addDoc(collection(db, 'orders'), {
         vendorId: vendor.id,
         customerName: formData.name,
@@ -202,27 +223,49 @@ export default function Storefront() {
         createdAt: new Date().toISOString(),
       });
 
-      // 3. Decrease stock for each item
+      // 2. Decrease stock for each item (wrap in try-catch to allow checkout even if stock updating fails)
       for (const item of cart) {
         if (item.product.id) {
-          const productRef = doc(db, 'products', item.product.id);
-          await updateDoc(productRef, {
-            stock: increment(-item.quantity)
-          });
+          try {
+            // Only decrease stock if it is a positive number (limited stock)
+            if (item.product.stock !== undefined && item.product.stock > 0) {
+              const productRef = doc(db, 'products', item.product.id);
+              await updateDoc(productRef, {
+                stock: increment(-item.quantity)
+              });
+            }
+          } catch (stockError) {
+            console.warn('Could not decrease product stock:', stockError);
+          }
         }
       }
 
       navigate(`/track/${orderRef.id}`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'orders');
-      alert('Checkout failed. Please try again.');
+      console.error('Checkout error:', error);
+      alert(language === 'ar' ? 'فشل إرسال الطلب. يرجى المحاولة مرة أخرى.' : 'Checkout failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return <div className="p-20 text-center">Loading Store...</div>;
-  if (error || !vendor) return <div className="p-20 text-center text-red-500 font-bold">{error || 'Store not found'}</div>;
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold animate-pulse">{language === 'ar' ? 'جاري فتح المتجر...' : 'Opening Store...'}</p>
+      </div>
+    </div>
+  );
+  if (error || !vendor) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center max-w-sm">
+        <X className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+        <p className="text-slate-800 font-black text-lg mb-2">{error || 'Store not found'}</p>
+        <button onClick={() => navigate('/')} className="text-indigo-600 font-bold text-sm">Return Home</button>
+      </div>
+    </div>
+  );
 
   const isExpired = vendor && (
     vendor.subscriptionStatus === 'expired' ||
@@ -341,7 +384,8 @@ export default function Storefront() {
                   {vendor.name}
                 </motion.h1>
                 
-                {/* Verified Store Badge */}
+{/* Verified Store Badge - Removed as requested */}
+                {/* 
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -351,6 +395,7 @@ export default function Storefront() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{language === 'ar' ? 'متجر نشط وموثق' : 'Active & Verified'}</span>
                 </motion.div>
+                */}
               </div>
               
               <div className="flex flex-wrap justify-center md:justify-start md:rtl:justify-end gap-2 sm:gap-3">
@@ -371,10 +416,27 @@ export default function Storefront() {
                     <span>@{vendor.instagram}</span>
                   </a>
                 )}
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/90 bg-slate-900/45 hover:bg-slate-900/60 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-full transition-all duration-200">
-                  <MapPin className="w-3 h-3 text-emerald-400" />
-                  <span>{vendor.location}</span>
-                </div>
+                {vendor.mapUrl ? (
+                  <a 
+                    href={vendor.mapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 backdrop-blur-md border border-indigo-500/20 px-3 py-1.5 rounded-full transition-all duration-200 shadow-sm"
+                  >
+                    <MapPin className="w-3 h-3 text-emerald-300 shrink-0" />
+                    <span>{vendor.location || (language === 'ar' ? 'موقعنا على الخارطة' : 'Our Location')}</span>
+                    {vendor.buildingNo && (
+                      <span className="text-[9px] bg-white/20 px-1 py-0.5 rounded text-white font-black ml-1">
+                        {language === 'ar' ? `مبنى ${vendor.buildingNo}` : `Bldg ${vendor.buildingNo}`}
+                      </span>
+                    )}
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/90 bg-slate-900/45 hover:bg-slate-900/60 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-full transition-all duration-200">
+                    <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>{vendor.location}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -410,100 +472,123 @@ export default function Storefront() {
         {/* Dynamic Products Grid */}
         <div className="grid grid-cols-2 gap-3.5 sm:flex sm:flex-col sm:space-y-6">
           <AnimatePresence mode="popLayout">
-            {filteredProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-2xl sm:rounded-[2.5rem] overflow-hidden border border-slate-50 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 group"
-              >
-                <div className="flex flex-col sm:flex-row">
-                  <div className="relative w-full h-36 sm:w-48 sm:h-48 overflow-hidden bg-slate-50 shrink-0">
-                    <img 
-                      src={product.imageUrl || 'https://picsum.photos/seed/product/400/400'} 
-                      alt={product.name} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute top-2 left-2 sm:top-4 sm:left-4">
-                      <span className={`text-[9px] sm:text-[10px] font-bold sm:font-black uppercase px-2 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-sm backdrop-blur-md ${
-                        product.category === 'drink' ? 'bg-blue-600 text-white' :
-                        product.category === 'meal' ? 'bg-orange-600 text-white' :
-                        product.category === 'canned' ? 'bg-emerald-600 text-white' :
-                        'bg-slate-900 text-white'
-                      }`}>
-                        {product.category === 'drink' ? 'مشروب' : product.category === 'meal' ? 'وجبة' : product.category === 'canned' ? 'معلب' : 'أخرى'}
-                      </span>
+            {productsLoading ? (
+              // Skeleton UI for loading
+              [...Array(6)].map((_, i) => (
+                <div key={`skeleton-${i}`} className="bg-white rounded-2xl sm:rounded-[2.5rem] overflow-hidden border border-slate-50 shadow-sm animate-pulse">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="w-full h-36 sm:w-48 sm:h-48 bg-slate-100" />
+                    <div className="p-3.5 sm:p-6 flex-1 space-y-4">
+                      <div className="h-4 bg-slate-100 rounded-full w-3/4" />
+                      <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+                      <div className="h-8 bg-slate-100 rounded-xl sm:rounded-3xl w-full mt-4" />
                     </div>
-                  </div>
-                  
-                  <div className="p-3.5 sm:p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-1.5 sm:gap-4 text-right rtl:text-right">
-                        <h3 className="font-black text-sm sm:text-xl text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">{product.name}</h3>
-                        <div className="flex flex-row sm:flex-col items-center sm:items-end gap-1 sm:gap-1.5 flex-wrap">
-                          <span className="text-indigo-600 font-black text-xs sm:text-lg bg-indigo-50 px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg sm:rounded-2xl shrink-0 whitespace-nowrap">{product.price} BHD</span>
-                          {product.stock !== undefined && product.stock <= 0 && (
-                            <span className="text-[9px] sm:text-[8px] font-bold sm:font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100 whitespace-nowrap">{t('store.outOfStock')}</span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-1 mb-2.5 sm:mb-4">
-                        {product.stock !== undefined && product.stock > 0 && product.stock <= 5 && (
-                          <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[9px] sm:text-[10px] font-black rounded-md border border-amber-100 italic">{t('store.onlyLeft', { n: product.stock })}</span>
-                        )}
-                        {product.volume && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.volume}</span>}
-                        {product.calories && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.calories} kcal</span>}
-                        {product.weight && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.weight}</span>}
-                      </div>
-                      
-                      <p className="text-slate-500 text-xs sm:text-[13px] font-medium line-clamp-1 sm:line-clamp-2 mb-4 sm:mb-6 leading-relaxed">
-                        {product.description}
-                      </p>
-                    </div>
-
-                    <button
-                      disabled={product.stock !== undefined && product.stock <= 0}
-                      onClick={() => {
-                        if ((product.addons && product.addons.length > 0) || (product.sizes && product.sizes.length > 0)) {
-                          setAddonProduct(product);
-                          setTempSelectedAddons([]);
-                          setTempSelectedSize(product.sizes?.[0] || null);
-                        } else {
-                          addToCart(product);
-                        }
-                      }}
-                      className={`w-full py-2.5 sm:py-3.5 rounded-xl sm:rounded-3xl font-black text-[10px] sm:text-[10px] uppercase tracking-wider sm:tracking-[0.2em] flex items-center justify-center gap-1 sm:gap-3 transition-all active:scale-95 shadow-lg ${
-                        product.stock !== undefined && product.stock <= 0
-                          ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
-                          : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-slate-200'
-                      }`}
-                    >
-                      {product.stock !== undefined && product.stock <= 0 ? (
-                        t('store.outOfStock')
-                      ) : (
-                        <>
-                          <Plus className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{t('store.addToOrder')}</span>
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
-              </motion.div>
-            ))}
+              ))
+            ) : filteredProducts.length > 0 ? (
+              filteredProducts.map((product) => (
+                <motion.div
+                  key={product.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white rounded-2xl sm:rounded-[2.5rem] overflow-hidden border border-slate-50 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 group"
+                >
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="relative w-full h-36 sm:w-48 sm:h-48 overflow-hidden bg-slate-50 shrink-0">
+                      <img 
+                        src={product.imageUrl || 'https://picsum.photos/seed/product/400/400'} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-2 left-2 sm:top-4 sm:left-4">
+                        <span className={`text-[9px] sm:text-[10px] font-bold sm:font-black uppercase px-2 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-sm backdrop-blur-md ${
+                          product.category === 'drink' ? 'bg-blue-600 text-white' :
+                          product.category === 'meal' ? 'bg-orange-600 text-white' :
+                          product.category === 'canned' ? 'bg-emerald-600 text-white' :
+                          'bg-slate-900 text-white'
+                        }`}>
+                          {product.category === 'drink' ? 'مشروب' : product.category === 'meal' ? 'وجبة' : product.category === 'canned' ? 'معلب' : 'أخرى'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-3.5 sm:p-6 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-1.5 sm:gap-4 text-right rtl:text-right">
+                          <h3 className="font-black text-sm sm:text-xl text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">{product.name}</h3>
+                          <div className="flex flex-row sm:flex-col items-center sm:items-end gap-1 sm:gap-1.5 flex-wrap">
+                            <span className="text-indigo-600 font-black text-xs sm:text-lg bg-indigo-50 px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg sm:rounded-2xl shrink-0 whitespace-nowrap">{product.price} BHD</span>
+                            {product.stock !== undefined && product.stock < 0 && (
+                              <span className="text-[9px] sm:text-[8px] font-bold sm:font-black uppercase text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100 whitespace-nowrap">{t('store.outOfStock')}</span>
+                            )}
+                            {/* Unlimited tag removed as requested */}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-1 mb-2.5 sm:mb-4">
+                          {product.stock !== undefined && product.stock > 0 && product.stock <= 5 && (
+                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[9px] sm:text-[10px] font-black rounded-md border border-amber-100 italic">{t('store.onlyLeft', { n: product.stock })}</span>
+                          )}
+                          {product.volume && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.volume}</span>}
+                          {product.calories && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.calories} kcal</span>}
+                          {product.weight && <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-[9px] sm:text-[10px] font-black rounded-md border border-slate-100">{product.weight}</span>}
+                          {product.madeToOrder && (
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-600 text-[9px] sm:text-[11px] font-black rounded-lg border border-purple-100 shadow-sm">
+                              <Clock className="w-3 h-3" />
+                              {language === 'ar' ? `تجهيز: ${product.prepTime}` : `Prep: ${product.prepTime}`}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-slate-500 text-xs sm:text-[13px] font-medium line-clamp-1 sm:line-clamp-2 mb-4 sm:mb-6 leading-relaxed">
+                          {product.description}
+                        </p>
+                      </div>
+
+                      <button
+                        disabled={product.stock !== undefined && product.stock < 0}
+                        onClick={() => {
+                          if ((product.addons && product.addons.length > 0) || (product.sizes && product.sizes.length > 0)) {
+                            setAddonProduct(product);
+                            setTempSelectedAddons([]);
+                            setTempSelectedSize(product.sizes?.[0] || null);
+                          } else {
+                            addToCart(product);
+                          }
+                        }}
+                        className={`w-full py-2.5 sm:py-3.5 rounded-xl sm:rounded-3xl font-black text-[10px] sm:text-[10px] uppercase tracking-wider sm:tracking-[0.2em] flex items-center justify-center gap-1 sm:gap-3 transition-all active:scale-95 shadow-lg ${
+                          product.stock !== undefined && product.stock < 0
+                            ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
+                            : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-slate-200'
+                        }`}
+                      >
+                        {product.stock !== undefined && product.stock < 0 ? (
+                          t('store.outOfStock')
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{t('store.addToOrder')}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            ) : null}
           </AnimatePresence>
 
-          {filteredProducts.length === 0 && (
+          {!productsLoading && filteredProducts.length === 0 && (
             <div className="py-24 text-center">
               <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
                 <ShoppingBag className="w-12 h-12" />
               </div>
-              <h3 className="text-slate-800 font-black text-xl mb-2">قريباً في هذا القسم</h3>
-              <p className="text-slate-400 text-sm font-medium">لا توجد منتجات حالياً، جرب تصفح الأقسام الأخرى</p>
+              <h3 className="text-slate-800 font-black text-xl mb-2">{language === 'ar' ? 'القسم فارغ حالياً' : 'No products in this section'}</h3>
+              <p className="text-slate-400 text-sm font-medium">{language === 'ar' ? 'لا توجد منتجات في هذا القسم حالياً، جرب تصفح الأقسام الأخرى' : 'No products available here yet, try browsing other categories'}</p>
             </div>
           )}
         </div>
@@ -730,6 +815,12 @@ export default function Storefront() {
                               + {item.selectedAddons.map(a => a.name).join(', ')}
                             </p>
                           )}
+                          {item.product.madeToOrder && (
+                            <p className="text-[10px] text-purple-600 font-black mt-0.5 flex items-center gap-1 rtl:flex-row-reverse">
+                              <Clock className="w-3 h-3" />
+                              {language === 'ar' ? `تنفيذ عند الطلب: ${item.product.prepTime}` : `Made to order: ${item.product.prepTime}`}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right rtl:text-left">
@@ -750,6 +841,20 @@ export default function Storefront() {
                     <span className="text-lg font-extrabold text-indigo-600">{cartTotal} BHD</span>
                   </div>
                 </div>
+
+                {cart.some(i => i.product.madeToOrder) && (
+                  <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 flex items-start gap-3 rtl:flex-row-reverse">
+                    <Clock className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
+                    <div className="text-right rtl:text-right">
+                      <p className="text-xs font-black text-purple-900">{language === 'ar' ? 'تنبيه: طلب مسبق' : 'Pre-order Notice'}</p>
+                      <p className="text-[10px] text-purple-600 font-bold leading-tight">
+                        {language === 'ar' 
+                          ? 'سلتك تحتوي على منتجات تتطلب وقتاً للتجهيز. سيتم البدء في التنفيذ بعد تأكيد طلبك.' 
+                          : 'Your cart contains items that require preparation time. Execution will start after confirmation.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Checkout Form */}
                 <form onSubmit={handleCheckout} className="space-y-4">
@@ -899,12 +1004,21 @@ export default function Storefront() {
                           accept="image/*"
                           onChange={handleFileUpload}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                          required
+                          required={!receiptImage}
+                          disabled={isUploadingReceipt}
                         />
                         <div className={`w-full aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${
+                          isUploadingReceipt ? 'border-indigo-600 bg-indigo-50/20' :
                           receiptImage ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-200 group-hover:border-indigo-400 bg-white group-hover:bg-indigo-50/20'
                         }`}>
-                          {receiptImage ? (
+                          {isUploadingReceipt ? (
+                            <div className="flex flex-col items-center justify-center p-6">
+                              <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                              <p className="text-xs font-black text-indigo-600 tracking-wider uppercase">
+                                {language === 'ar' ? 'جاري رفع الإيصال...' : 'Uploading receipt...'}
+                              </p>
+                            </div>
+                          ) : receiptImage ? (
                             <div className="relative w-full h-full p-2">
                               <img src={receiptImage} className="w-full h-full object-cover rounded-xl" alt="Receipt preview" />
                               <div className="absolute inset-0 bg-indigo-600/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
@@ -922,6 +1036,9 @@ export default function Storefront() {
                           )}
                         </div>
                       </div>
+                      {receiptUploadError && (
+                        <p className="text-xs font-bold text-rose-500 mt-2 text-center">{receiptUploadError}</p>
+                      )}
                     </div>
                   </div>
 

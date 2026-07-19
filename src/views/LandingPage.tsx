@@ -147,7 +147,7 @@ export default function LandingPage() {
     <div className="bg-slate-50/40 min-h-screen text-slate-800 selection:bg-indigo-500 selection:text-white overflow-hidden">
       
       {/* Immersive Responsive Hero Section */}
-      <section className="relative pt-12 lg:pt-24 pb-16 lg:pb-28 overflow-hidden bg-white border-b border-slate-100">
+      <section id="simulator" className="relative pt-16 lg:pt-24 pb-16 lg:pb-28 overflow-hidden bg-white border-b border-slate-100">
         {/* Ambient Gradient Background Elements */}
         <div className="absolute top-0 right-0 -translate-y-1/3 translate-x-1/4 w-[500px] h-[500px] bg-indigo-100/40 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/4 w-[500px] h-[500px] bg-violet-100/40 rounded-full blur-[140px] pointer-events-none" />
@@ -325,14 +325,19 @@ export default function LandingPage() {
                           className="flex-1 flex flex-col justify-between"
                         >
                           <div className="space-y-4">
-                             <div className="flex items-center gap-2">
-                               <div className="relative h-8 flex items-center">
-                                 <img src="/logo-text.png" alt="Jareeb" className="h-8 w-auto object-contain" />
-                               </div>
-                               <div>
-                                <h4 className="text-xs font-black text-slate-800">{language === 'ar' ? 'مخبز جريب الفاخر' : 'Jareeb Bakeries'}</h4>
-                                <p className="text-[9px] text-slate-400 font-bold">{language === 'ar' ? 'المنامة، البحرين' : 'Manama, Bahrain'}</p>
+                            <div className="flex flex-col items-start group">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xl font-black text-slate-900 tracking-tighter uppercase">Jareeb</span>
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse mt-1" />
                               </div>
+                              <span className="text-[7px] font-black text-slate-400 -mt-1 tracking-wider uppercase">
+                                من بيتهم ... الى سيارتك
+                              </span>
+                            </div>
+                            
+                            <div>
+                              <h4 className="text-xs font-black text-slate-800">{language === 'ar' ? 'مخبز جريب الفاخر' : 'Jareeb Bakeries'}</h4>
+                              <p className="text-[9px] text-slate-400 font-bold">{language === 'ar' ? 'المنامة، البحرين' : 'Manama, Bahrain'}</p>
                             </div>
                             
                             {/* Product Card */}
@@ -508,7 +513,7 @@ export default function LandingPage() {
                             onClick={resetSimulator}
                             className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-colors"
                           >
-                            {language === 'ar' ? 'تكرار المحاكاة التفاعلية 🔄' : 'Restart Demo 🔄'}
+                            {language === 'ar' ? 'جرب المنصة الآن 🔄' : 'Experience the Platform 🔄'}
                           </button>
                         </motion.div>
                       )}
@@ -519,7 +524,7 @@ export default function LandingPage() {
                   <div className="bg-slate-50 border-t border-slate-100 px-4 py-3 flex justify-between items-center text-[9px] font-black uppercase text-slate-400">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                      {language === 'ar' ? 'محاكاة جريب التفاعلية' : 'Jareeb Interactive Demo'}
+                      {language === 'ar' ? 'تجربة جريب الحقيقية' : 'The Jareeb Experience'}
                     </span>
                     <button onClick={resetSimulator} className="hover:text-indigo-600 transition-colors">
                       {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
@@ -534,7 +539,7 @@ export default function LandingPage() {
       </section>
 
       {/* Modern Bento-styled Features Grid */}
-      <section className="py-24 bg-slate-50/50 relative border-b border-slate-100">
+      <section id="features" className="py-24 bg-slate-50/50 relative border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20 space-y-4">
             <motion.div
@@ -711,7 +716,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-24 bg-slate-50/30 overflow-hidden relative border-b border-slate-100">
+      <section id="pricing" className="py-24 bg-slate-50/30 overflow-hidden relative border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center mb-16 space-y-4">
             <div className="inline-block px-4 py-1.5 rounded-full bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
@@ -750,83 +755,92 @@ export default function LandingPage() {
                 features: language === 'ar' ? ["مواقع متعددة", "حسابات موظفين", "نطاق مخصص", "وصول واجهة برمجة التطبيقات", "مدير حساب"] : ["Multiple locations", "Staff accounts", "Custom domain", "API access", "Account manager"],
                 icon: <ShieldCheck className="w-6 h-6 text-emerald-600" />,
                 cta: language === 'ar' ? "اتصل بالمبيعات" : "Contact Sales",
+                href: `https://wa.me/97336368522?text=${encodeURIComponent(language === 'ar' ? 'مرحباً، أود الاستفسار عن خطة الشركات في منصة جريب' : 'Hello, I would like to inquire about the Enterprise plan on Jareeb platform')}`,
                 popular: false
               }
-            ].map((plan, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                className={`relative p-8 sm:p-10 rounded-[2.5rem] border ${
-                  plan.popular 
-                    ? 'bg-slate-900 text-white border-slate-800 shadow-2xl shadow-indigo-100/55' 
-                    : 'bg-white border-slate-100 shadow-sm'
-                } flex flex-col justify-between`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
-                    {t('pricing.popular')}
-                  </div>
-                )}
+            ].map((plan, i) => {
+              const isExternal = 'href' in plan;
+              const ButtonComponent = isExternal ? 'a' : Link;
+              const buttonProps = isExternal 
+                ? { href: plan.href, target: "_blank", rel: "noopener noreferrer" } 
+                : { to: "/register" };
 
-                {plan.tag && (
-                  <motion.div 
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 whitespace-nowrap shadow-lg shadow-indigo-200"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    {plan.tag}
-                  </motion.div>
-                )}
-                
-                <div>
-                  <div className="mb-8 flex justify-between items-start">
-                    <div>
-                      <h3 className={`text-xl sm:text-2xl font-black mb-2 ${plan.popular ? 'text-[#e3dada]' : ''}`}>{plan.name}</h3>
-                      <p className={`${plan.popular ? 'text-slate-400' : 'text-slate-400'} font-bold text-xs`}>{plan.desc}</p>
-                    </div>
-                    <div className={`${plan.popular ? 'bg-white/10' : 'bg-slate-50'} p-2.5 rounded-xl`}>
-                      {plan.icon}
-                    </div>
-                  </div>
-
-                  <div className="mb-8 flex items-baseline gap-2">
-                    {'customPriceLabel' in plan ? (
-                      <span className="text-xl sm:text-2xl font-black text-indigo-600">{plan.customPriceLabel}</span>
-                    ) : (
-                      <>
-                        <span className="text-4xl sm:text-5xl font-black text-indigo-600">{plan.price}</span>
-                        <span className={`${plan.popular ? 'text-slate-400' : 'text-slate-400'} font-black text-xs`}>{t('pricing.month')}</span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="space-y-4 mb-8">
-                    {plan.features.map((feat, j) => (
-                      <div key={j} className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${plan.popular ? 'bg-indigo-500 text-white' : 'bg-emerald-50 text-emerald-600'}`}>
-                          <Check className="w-2.5 h-2.5" />
-                        </div>
-                        <span className="text-xs sm:text-sm font-bold opacity-90">{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Link
-                  to="/register"
-                  className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all block text-center ${
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  className={`relative p-8 sm:p-10 rounded-[2.5rem] border ${
                     plan.popular 
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.03] active:scale-95 shadow-lg shadow-indigo-900/30' 
-                      : 'bg-slate-900 text-white hover:bg-indigo-600'
-                  }`}
+                      ? 'bg-slate-900 text-white border-slate-800 shadow-2xl shadow-indigo-100/55' 
+                      : 'bg-white border-slate-100 shadow-sm'
+                  } flex flex-col justify-between`}
                 >
-                  {plan.cta}
-                </Link>
-              </motion.div>
-            ))}
+                  {plan.popular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
+                      {t('pricing.popular')}
+                    </div>
+                  )}
+
+                  {plan.tag && (
+                    <motion.div 
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 whitespace-nowrap shadow-lg shadow-indigo-200"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                      {plan.tag}
+                    </motion.div>
+                  )}
+                  
+                  <div>
+                    <div className="mb-8 flex justify-between items-start">
+                      <div>
+                        <h3 className={`text-xl sm:text-2xl font-black mb-2 ${plan.popular ? 'text-[#e3dada]' : ''}`}>{plan.name}</h3>
+                        <p className={`${plan.popular ? 'text-slate-400' : 'text-slate-400'} font-bold text-xs`}>{plan.desc}</p>
+                      </div>
+                      <div className={`${plan.popular ? 'bg-white/10' : 'bg-slate-50'} p-2.5 rounded-xl`}>
+                        {plan.icon}
+                      </div>
+                    </div>
+
+                    <div className="mb-8 flex items-baseline gap-2">
+                      {'customPriceLabel' in plan ? (
+                        <span className="text-xl sm:text-2xl font-black text-indigo-600">{plan.customPriceLabel}</span>
+                      ) : (
+                        <>
+                          <span className="text-4xl sm:text-5xl font-black text-indigo-600">{plan.price}</span>
+                          <span className={`${plan.popular ? 'text-slate-400' : 'text-slate-400'} font-black text-xs`}>{t('pricing.month')}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="space-y-4 mb-8">
+                      {plan.features.map((feat, j) => (
+                        <div key={j} className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center ${plan.popular ? 'bg-indigo-500 text-white' : 'bg-emerald-50 text-emerald-600'}`}>
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                          <span className="text-xs sm:text-sm font-bold opacity-90">{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <ButtonComponent
+                    {...(buttonProps as any)}
+                    className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all block text-center ${
+                      plan.popular 
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.03] active:scale-95 shadow-lg shadow-indigo-900/30' 
+                        : 'bg-slate-900 text-white hover:bg-indigo-600'
+                    }`}
+                  >
+                    {plan.cta}
+                  </ButtonComponent>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -843,9 +857,15 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-indigo-950/40">
             {/* Branding Column */}
             <div className="md:col-span-5 space-y-4 text-center md:text-left rtl:md:text-right">
-              <h2 className="text-3xl font-black text-white tracking-tight flex items-center justify-center md:justify-start">
-                <img src="/logo-text.png" alt="Jareeb" className="h-10 w-auto object-contain brightness-0 invert" />
-              </h2>
+              <div className="flex flex-col items-center md:items-start group">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl font-black text-white tracking-tighter uppercase">Jareeb</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse mt-2" />
+                </div>
+                <span className="text-[10px] font-black text-indigo-400 -mt-1 tracking-wider uppercase">
+                  من بيتهم ... الى سيارتك
+                </span>
+              </div>
               <p className="text-slate-400 font-medium text-xs sm:text-sm leading-relaxed max-w-sm">
                 {language === 'ar' 
                   ? 'منصة ذكية تمكّن أصحاب المشاريع المنزلية من إنشاء متجر إلكتروني احترافي، إدارة الطلبات، واستقبال المدفوعات بكل سهولة.' 
@@ -875,7 +895,7 @@ export default function LandingPage() {
                 </li>
                 <li>
                   <a href="#simulator" className="hover:text-indigo-400 transition-colors">
-                    {language === 'ar' ? 'تجربة المحاكاة التفاعلية' : 'Try Demo Simulator'}
+                    {language === 'ar' ? 'استكشف المنصة' : 'Explore Platform'}
                   </a>
                 </li>
               </ul>

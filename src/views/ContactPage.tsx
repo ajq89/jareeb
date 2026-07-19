@@ -33,7 +33,7 @@ interface ContactSettings {
 const DEFAULT_SETTINGS: ContactSettings = {
   supportEmail: 'support@jareeb.com',
   salesEmail: 'sales@jareeb.com',
-  supportWhatsapp: '+97330000000',
+  supportWhatsapp: '+97336368522',
   instagramUrl: 'https://instagram.com/jareeb.bh',
 };
 

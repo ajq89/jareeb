@@ -158,15 +158,37 @@ export default function TrackingPage() {
               </div>
 
               <div className="space-y-6">
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-center gap-5">
-                  <div className="w-14 h-14 bg-white rounded-2xl shadow-indigo-100 shadow-lg flex items-center justify-center text-indigo-600 border border-slate-100 shrink-0">
-                    <MapPin className="w-7 h-7" />
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col gap-4">
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-white rounded-2xl shadow-indigo-100 shadow-lg flex items-center justify-center text-indigo-600 border border-slate-100 shrink-0">
+                      <MapPin className="w-7 h-7" />
+                    </div>
+                    <div className="rtl:text-right flex-1">
+                      <p className="text-xs sm:text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{language === 'ar' ? 'عنوان الاستلام بالتفصيل' : 'Detailed Pickup Address'}</p>
+                      <p className="font-black text-slate-800 text-lg leading-tight">{vendor?.name}</p>
+                      
+                      {/* Standard Bahrain Address Display */}
+                      <p className="text-sm sm:text-xs text-slate-600 font-bold mt-1.5 flex flex-wrap gap-1.5 rtl:flex-row-reverse">
+                        {vendor?.location && <span>{vendor.location}</span>}
+                        {vendor?.buildingNo && <span>• {language === 'ar' ? `مبنى ${vendor.buildingNo}` : `Bldg ${vendor.buildingNo}`}</span>}
+                        {vendor?.roadNo && <span>• {language === 'ar' ? `طريق ${vendor.roadNo}` : `Road ${vendor.roadNo}`}</span>}
+                        {vendor?.blockNo && <span>• {language === 'ar' ? `مجمع ${vendor.blockNo}` : `Block ${vendor.blockNo}`}</span>}
+                        {vendor?.city && <span>• {vendor.city}</span>}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rtl:text-right">
-                    <p className="text-xs sm:text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{language === 'ar' ? 'نقطة الاستلام' : 'Pickup Point'}</p>
-                    <p className="font-black text-slate-800 text-lg leading-tight">{vendor?.name}</p>
-                    <p className="text-sm sm:text-xs text-slate-600 font-medium mt-1">{vendor?.location?.address || (language === 'ar' ? 'منطقة الاستلام من السيارة' : 'Curbside Pickup Zone')}</p>
-                  </div>
+
+                  {vendor?.mapUrl && (
+                    <a 
+                      href={vendor.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-emerald-100/50"
+                    >
+                      <MapPin className="w-4 h-4 text-white" />
+                      {language === 'ar' ? 'فتح الموقع في قوقل ماب' : 'Open in Google Maps'}
+                    </a>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-4">

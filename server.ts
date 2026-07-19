@@ -4,8 +4,9 @@ import fs from "fs/promises";
 import { readFileSync } from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 // Load environment variables
 dotenv.config();
@@ -13,17 +14,41 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Initialize Firebase using the configuration json in workspace root
-let db: any = null;
+// Initialize Firebase Admin using the configuration json in workspace root
+let db: Firestore | null = null;
+let bucket: any = null;
+
 try {
   const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
   const firebaseConfigRaw = readFileSync(firebaseConfigPath, "utf-8");
   const firebaseConfig = JSON.parse(firebaseConfigRaw);
-  const firebaseApp = initializeApp(firebaseConfig);
+
+  const firebaseApp = getApps().length === 0 ? initializeApp({
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket
+  }) : getApps()[0];
+
   db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
-  console.log("Firebase initialized successfully on backend server.");
+  bucket = getStorage(firebaseApp).bucket();
+  console.log("Firebase Admin initialized successfully on backend server with database:", firebaseConfig.firestoreDatabaseId);
 } catch (error) {
-  console.error("Warning: Failed to load Firebase on backend server. Check firebase-applet-config.json.", error);
+  console.error("Warning: Failed to load Firebase Admin on backend server. Falling back to internal defaults.", error);
+  // Fallback initialization if applicationDefault() fails
+  try {
+    const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+    const firebaseConfigRaw = readFileSync(firebaseConfigPath, "utf-8");
+    const firebaseConfig = JSON.parse(firebaseConfigRaw);
+    
+    const firebaseApp = getApps().length === 0 ? initializeApp({
+      projectId: firebaseConfig.projectId,
+      storageBucket: firebaseConfig.storageBucket
+    }) : getApps()[0];
+
+    db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+    bucket = getStorage(firebaseApp).bucket();
+  } catch (innerError) {
+    console.error("Critical: Failed to initialize Firebase Admin fallback.", innerError);
+  }
 }
 
 // API Routes FIRST
@@ -34,7 +59,7 @@ app.get("/api/health", (req, res) => {
 // Image upload route (handles base64 product images from the client)
 app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, res: any) => {
   try {
-    const { image } = req.body;
+    const { image, vendorId } = req.body;
     if (!image) {
       return res.status(400).json({ error: "No image data provided" });
     }
@@ -49,15 +74,35 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
     const buffer = Buffer.from(matches[2], "base64");
 
     const filename = `raw_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
+    let imageUrl = "";
 
-    // Ensure uploads directory exists
+    // Upload to Firebase Storage under the vendor's specific folder if vendorId and bucket are available
+    if (vendorId && bucket) {
+      try {
+        const file = bucket.file(`vendors/${vendorId}/${filename}`);
+        await file.save(buffer, {
+          metadata: { contentType: imageType },
+          public: true
+        });
+        // Construct public URL
+        imageUrl = `https://storage.googleapis.com/${bucket.name}/vendors/${vendorId}/${filename}`;
+        console.log(`Uploaded image to Firebase Storage for vendor ${vendorId}: ${imageUrl}`);
+      } catch (storageErr: any) {
+        console.log("Firebase Storage is unprovisioned or has restrictive permissions. Saving file locally instead.");
+      }
+    }
+
+    // Always write to local public/uploads directory as a fallback/cache mechanism
+    const uploadsDir = path.join(process.cwd(), "public", "uploads");
     await fs.mkdir(uploadsDir, { recursive: true });
 
     const filepath = path.join(uploadsDir, filename);
     await fs.writeFile(filepath, buffer);
 
-    const imageUrl = `/uploads/${filename}`;
+    if (!imageUrl) {
+      imageUrl = `/uploads/${filename}`;
+    }
+
     res.json({ imageUrl });
   } catch (err: any) {
     console.error("Upload error:", err);
@@ -79,14 +124,14 @@ app.post("/api/generate-ai-image", express.json({ limit: "10mb" }), async (req: 
     }
 
     // 1. Validate credit quota of the vendor
-    const vendorRef = doc(db, "vendors", vendorId);
-    const vendorSnap = await getDoc(vendorRef);
+    const vendorRef = db.collection("vendors").doc(vendorId);
+    const vendorSnap = await vendorRef.get();
 
-    if (!vendorSnap.exists()) {
+    if (!vendorSnap.exists) {
       return res.status(404).json({ error: "Vendor/Store profile not found." });
     }
 
-    const vendorData = vendorSnap.data();
+    const vendorData = vendorSnap.data() || {};
 
     // Verification: Pro Plan requirement checks
     if (vendorData.plan !== "pro" && vendorData.plan !== "enterprise") {
@@ -97,7 +142,7 @@ app.post("/api/generate-ai-image", express.json({ limit: "10mb" }), async (req: 
     // Default to 10 trial credits if undefined to ensure immediate utility
     if (credits === undefined) {
       credits = 10;
-      await updateDoc(vendorRef, { aiCredits: credits });
+      await vendorRef.update({ aiCredits: credits });
     }
 
     if (credits <= 0) {
@@ -106,7 +151,7 @@ app.post("/api/generate-ai-image", express.json({ limit: "10mb" }), async (req: 
 
     // Deduct credit
     const nextCredits = credits - 1;
-    await updateDoc(vendorRef, { aiCredits: nextCredits });
+    await vendorRef.update({ aiCredits: nextCredits });
 
     // 2. Formulate high-quality thematic prompts
     let promptText = "";
@@ -152,10 +197,9 @@ app.post("/api/generate-ai-image", express.json({ limit: "10mb" }), async (req: 
       const filepath = path.join(process.cwd(), "public", "uploads", filename);
       
       const fileBuffer = await fs.readFile(filepath);
-      const blob = new Blob([fileBuffer], { type: "image/png" });
-
+      // PhotoRoom expects a Blob or File. In Node, we can send the buffer directly.
       const formData = new FormData();
-      formData.append("image_file", blob, filename);
+      formData.append("image_file", new Blob([fileBuffer]), filename);
       formData.append("prompt", promptText);
 
       const response = await fetch("https://image-api.photoroom.com/v1/instant-backgrounds", {
@@ -188,7 +232,6 @@ app.post("/api/generate-ai-image", express.json({ limit: "10mb" }), async (req: 
     } catch (apiError: any) {
       console.error("Error communicating with PhotoRoom API. Falling back safely.", apiError);
       
-      // If photoRoom API crashes, refund the credit or provide simulated output
       let fallbackUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80";
       
       return res.json({
@@ -214,9 +257,25 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom",
     });
     app.use(vite.middlewares);
+
+    // Explicit fallback for client-side routing in development mode
+    app.get("*", async (req, res, next) => {
+      // Skip API routes, uploaded files, and requests with file extensions
+      if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || req.path.includes(".")) {
+        return next();
+      }
+      try {
+        const template = await fs.readFile(path.join(process.cwd(), "index.html"), "utf-8");
+        const html = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -231,3 +290,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+

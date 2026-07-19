@@ -36,6 +36,11 @@ export interface Vendor {
   isClosedByUser?: boolean;
   isPublic?: boolean;
   customDomain?: string;
+  mapUrl?: string;
+  buildingNo?: string;
+  roadNo?: string;
+  blockNo?: string;
+  city?: string;
 }
 
 export interface Addon {
@@ -70,6 +75,8 @@ export interface Product {
   calories?: string;
   weight?: string;
   expiryDate?: string;
+  madeToOrder?: boolean;
+  prepTime?: string;
   createdAt: string;
 }
 

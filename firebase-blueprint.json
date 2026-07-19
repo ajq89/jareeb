@@ -9,6 +9,8 @@
         "name": { "type": "string", "maxLength": 100 },
         "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
         "iban": { "type": "string", "pattern": "^[A-Z0-9 ]+$" },
+        "plan": { "type": "string", "enum": ["free", "pro", "enterprise"] },
+        "aiCredits": { "type": "number", "minimum": 0 },
         "location": {
           "type": "object",
           "properties": {
@@ -31,6 +33,8 @@
         "price": { "type": "number", "minimum": 0 },
         "description": { "type": "string", "maxLength": 1000 },
         "imageUrl": { "type": "string" },
+        "madeToOrder": { "type": "boolean" },
+        "prepTime": { "type": "string", "maxLength": 100 },
         "addons": {
           "type": "array",
           "items": {
