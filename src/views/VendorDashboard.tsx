@@ -190,15 +190,40 @@ export default function VendorDashboard({ user }: DashboardProps) {
           handleFirestoreError(error, OperationType.GET, 'products');
         });
 
-        // Load orders (Real-time)
+        // Load orders (Real-time) - Removed orderBy to avoid index requirements
         const oq = query(
           collection(db, 'orders'), 
-          where('vendorId', '==', vendorData.id),
-          orderBy('createdAt', 'desc')
+          where('vendorId', '==', vendorData.id)
         );
+
         unsubscribeOrders = onSnapshot(oq, async (oSnap) => {
           const allOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Order);
           
+          // Sort manually since we removed orderBy from query
+          allOrders.sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+
+          // Check for new arrivals using docChanges for better performance and reliability
+          oSnap.docChanges().forEach((change) => {
+            if (change.type === 'added' || change.type === 'modified') {
+              const order = { id: change.doc.id, ...change.doc.data() } as Order;
+              
+              if (order.status === 'arrived' && order.id !== lastOrderArrived) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification('Customer Arrived!', { body: `${order.customerName} is outside.` });
+                }
+                playArrivalChime();
+                setLastOrderArrived(order.id);
+              }
+
+              // Play chime for NEW pending orders only
+              if (change.type === 'added' && order.status === 'pending' && order.customerName !== "SYSTEM_ADMIN_UPGRADE") {
+                playNotificationChime();
+              }
+            }
+          });
+
           // Handle real-time administrative plan upgrades in the background
           const upgradeOrders = allOrders.filter(o => o.customerName === "SYSTEM_ADMIN_UPGRADE");
           const realOrders = allOrders.filter(o => o.customerName !== "SYSTEM_ADMIN_UPGRADE");
@@ -208,7 +233,6 @@ export default function VendorDashboard({ user }: DashboardProps) {
           // Find the latest approved upgrade order to override active plan state in real-time
           const approvedUpgrades = upgradeOrders.filter(o => o.status === 'upgrade_approved');
           if (approvedUpgrades.length > 0) {
-            approvedUpgrades.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setActiveUpgradePlan(approvedUpgrades[0].newPlan || 'pro');
           } else {
             setActiveUpgradePlan(null);
@@ -218,44 +242,17 @@ export default function VendorDashboard({ user }: DashboardProps) {
             if (upgradeOrder.status === 'upgrade_approved') {
               const requestedPlan = upgradeOrder.newPlan || 'pro';
               try {
-                // Try to update the vendor document directly
                 await updateDoc(doc(db, 'vendors', vendorData.id), {
                   plan: requestedPlan,
                   subscriptionStatus: 'active',
                   subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
                 });
-                // If direct update succeeds, delete the processed trigger order
                 await deleteDoc(doc(db, 'orders', upgradeOrder.id));
               } catch (upgradeErr) {
-                // If it fails (due to schema/rules constraints), log a warning but keep the order
-                // because the UI will fallback to reading the upgrade plan from the order itself.
-                console.warn('Failed to automatically apply plan upgrade to vendors collection. Keeping order as persistent source of truth.', upgradeErr);
+                console.warn('Failed to automatically apply plan upgrade', upgradeErr);
               }
             }
           }
-          
-          // Check for new arrivals
-          const arrived = realOrders.find(o => o.status === 'arrived');
-          if (arrived) {
-            setLastOrderArrived(prev => {
-              if (arrived.id !== prev) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                  new Notification('Customer Arrived!', { body: `${arrived.customerName} is outside.` });
-                }
-                playArrivalChime();
-                return arrived.id;
-              }
-              return prev;
-            });
-          }
-
-          // Check for new pending orders
-          const pending = realOrders.filter(o => o.status === 'pending');
-          const newPending = pending.filter(o => !knownPendingOrders.has(o.id));
-          if (newPending.length > 0) {
-            playNotificationChime();
-          }
-          setKnownPendingOrders(new Set(pending.map(o => o.id)));
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'orders');
         });
@@ -275,7 +272,7 @@ export default function VendorDashboard({ user }: DashboardProps) {
       if (unsubscribeProducts) unsubscribeProducts();
       if (unsubscribeOrders) unsubscribeOrders();
     };
-  }, [user.uid, knownPendingOrders]);
+  }, [user.uid]);
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();

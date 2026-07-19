@@ -89,11 +89,15 @@ export default function Storefront() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ image: dataUrl, vendorId: vendor?.id })
             });
-            if (!res.ok) throw new Error();
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(`Server returned ${res.status}: ${errorText}`);
+            }
             const data = await res.json();
             setReceiptImage(data.imageUrl);
-          } catch (err) {
-            console.error('Failed to upload receipt image to Firebase Storage', err);
+            console.log('Receipt image uploaded successfully:', data.imageUrl);
+          } catch (err: any) {
+            console.error('Failed to upload receipt image to server:', err);
             // Fallback to local base64 if upload fails completely
             setReceiptImage(dataUrl);
             setReceiptUploadError(language === 'ar' ? 'فشل الرفع للمخدم، تم استخدام الصورة محلياً.' : 'Upload failed, image stored locally.');

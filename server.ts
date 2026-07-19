@@ -58,14 +58,19 @@ app.get("/api/health", (req, res) => {
 
 // Image upload route (handles base64 product images from the client)
 app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, res: any) => {
+  console.log("POST /api/upload-image request received");
   try {
     const { image, vendorId } = req.body;
     if (!image) {
+      console.error("Upload error: No image data provided");
       return res.status(400).json({ error: "No image data provided" });
     }
 
+    console.log(`Image received, length: ${image.length}, vendorId: ${vendorId || 'none'}`);
+
     const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
+      console.error("Upload error: Invalid base64 image format");
       return res.status(400).json({ error: "Invalid base64 image format" });
     }
 
@@ -76,36 +81,54 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
     const filename = `raw_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
     let imageUrl = "";
 
-    // Upload to Firebase Storage under the vendor's specific folder if vendorId and bucket are available
+    // 1. ALWAYS SAVE LOCALLY FIRST as it is the most reliable
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+
+      const filepath = path.join(uploadsDir, filename);
+      await fs.writeFile(filepath, buffer);
+      console.log(`Image saved locally: /uploads/${filename}`);
+      imageUrl = `/uploads/${filename}`;
+    } catch (fsErr: any) {
+      console.error("CRITICAL: Failed to save image locally:", fsErr);
+      // We don't throw yet, we will try Firebase next if available
+    }
+
+    // 2. TRY FIREBASE STORAGE in a separate block
     if (vendorId && bucket) {
       try {
+        console.log(`Attempting Firebase Storage upload for vendor ${vendorId}...`);
         const file = bucket.file(`vendors/${vendorId}/${filename}`);
-        await file.save(buffer, {
+        
+        // Use a Promise with timeout for the save operation
+        const uploadPromise = file.save(buffer, {
           metadata: { contentType: imageType },
           public: true
         });
-        // Construct public URL
+
+        // Set a 10s timeout for the upload
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Firebase Storage upload timed out")), 10000)
+        );
+
+        await Promise.race([uploadPromise, timeoutPromise]);
+        
+        // Update imageUrl to the cloud one if successful
         imageUrl = `https://storage.googleapis.com/${bucket.name}/vendors/${vendorId}/${filename}`;
         console.log(`Uploaded image to Firebase Storage for vendor ${vendorId}: ${imageUrl}`);
       } catch (storageErr: any) {
-        console.log("Firebase Storage is unprovisioned or has restrictive permissions. Saving file locally instead.");
+        console.warn("Firebase Storage upload skipped or failed. Using local path instead.", storageErr.message);
       }
     }
 
-    // Always write to local public/uploads directory as a fallback/cache mechanism
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
-
-    const filepath = path.join(uploadsDir, filename);
-    await fs.writeFile(filepath, buffer);
-
     if (!imageUrl) {
-      imageUrl = `/uploads/${filename}`;
+      throw new Error("Failed to save image to any storage medium.");
     }
 
     res.json({ imageUrl });
   } catch (err: any) {
-    console.error("Upload error:", err);
+    console.error("Final Upload error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -257,20 +280,20 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "custom",
+      appType: "spa",
     });
     app.use(vite.middlewares);
 
     // Explicit fallback for client-side routing in development mode
     app.get("*", async (req, res, next) => {
-      // Skip API routes, uploaded files, and requests with file extensions
-      if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || req.path.includes(".")) {
+      // Skip API routes, uploaded files, and requests with file extensions (to allow Vite to serve assets)
+      if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || (req.path.includes(".") && !req.path.endsWith(".html"))) {
         return next();
       }
       try {
         const template = await fs.readFile(path.join(process.cwd(), "index.html"), "utf-8");
-        const html = await vite.transformIndexHtml(req.originalUrl, template);
-        res.status(200).set({ "Content-Type": "text/html" }).end(html);
+        const html = await vite.transformIndexHtml(req.originalUrl || req.url, template);
+        res.status(200).type("text/html").send(html);
       } catch (e) {
         vite.ssrFixStacktrace(e as Error);
         next(e);
