@@ -78,6 +78,8 @@ export interface Product {
   madeToOrder?: boolean;
   prepTime?: string;
   createdAt: string;
+  is_custom_cake?: boolean;
+  price_per_kg?: number;
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'ready' | 'arrived' | 'completed';

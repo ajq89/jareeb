@@ -11,6 +11,8 @@ import { Vendor, Product, Addon, Size, ProductCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, ShoppingBag, X, CheckCircle2, CreditCard, User, Phone, Clock, Plus, ChevronRight, CupSoda, Bell, Package, Instagram, MapPin, ExternalLink, Filter, Coffee, Languages, Globe } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { getSupabaseClient } from '../lib/supabase';
+import CakeSpecsForm from '../components/CakeSpecsForm';
 
 export default function Storefront() {
   const { t, language, setLanguage } = useLanguage();
@@ -25,16 +27,22 @@ export default function Storefront() {
     selectedAddons: Addon[];
     selectedSize?: Size;
     cartId: string;
+    cakeSpecs?: any;
   }[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Supabase store status state
+  const [supabaseStoreClosed, setSupabaseStoreClosed] = useState<boolean | null>(null);
+  const [supabaseClosureMessage, setSupabaseClosureMessage] = useState<string | null>(null);
+
   // Addon & Size selection state
   const [addonProduct, setAddonProduct] = useState<Product | null>(null);
   const [tempSelectedAddons, setTempSelectedAddons] = useState<Addon[]>([]);
   const [tempSelectedSize, setTempSelectedSize] = useState<Size | null>(null);
+  const [tempCakeSpecs, setTempCakeSpecs] = useState<any>(null);
 
   // Form state
   const [formData, setFormData] = useState({ 
@@ -84,6 +92,44 @@ export default function Storefront() {
           // Compress to JPEG with 0.6 quality - significant reduction
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           try {
+            const hasSupabaseKeys = 
+              Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
+              Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+
+            if (hasSupabaseKeys) {
+              try {
+                console.log('Attempting receipt upload to Supabase storage...');
+                const supabase = getSupabaseClient();
+                
+                // Convert base64 dataURL to Blob
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                
+                const filename = `receipts/receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
+                
+                const { error } = await supabase.storage
+                  .from('products')
+                  .upload(filename, blob, {
+                    contentType: 'image/jpeg',
+                    cacheControl: '3600',
+                    upsert: true
+                  });
+
+                if (error) throw error;
+
+                const { data: { publicUrl } } = supabase.storage
+                  .from('products')
+                  .getPublicUrl(filename);
+
+                setReceiptImage(publicUrl);
+                console.log('Receipt image uploaded successfully to Supabase:', publicUrl);
+                setIsUploadingReceipt(false);
+                return;
+              } catch (supabaseErr) {
+                console.warn('Supabase receipt upload failed, falling back to server...', supabaseErr);
+              }
+            }
+
             const res = await fetch('/api/upload-image', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -97,7 +143,7 @@ export default function Storefront() {
             setReceiptImage(data.imageUrl);
             console.log('Receipt image uploaded successfully:', data.imageUrl);
           } catch (err: any) {
-            console.error('Failed to upload receipt image to server:', err);
+            console.error('Failed to upload receipt image:', err);
             // Fallback to local base64 if upload fails completely
             setReceiptImage(dataUrl);
             setReceiptUploadError(language === 'ar' ? 'فشل الرفع للمخدم، تم استخدام الصورة محلياً.' : 'Upload failed, image stored locally.');
@@ -142,6 +188,34 @@ export default function Storefront() {
     loadStore();
   }, [slug]);
 
+  useEffect(() => {
+    const fetchSupabaseStoreStatus = async () => {
+      if (!vendor?.id) return;
+      try {
+        const hasSupabaseKeys = 
+          Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
+          Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+        if (!hasSupabaseKeys) return;
+
+        const supabase = getSupabaseClient();
+        const { data, error } = (await supabase
+          .from('stores')
+          .select('is_closed, closure_message')
+          .eq('id', vendor.id)
+          .maybeSingle()) as any;
+
+        if (data && !error) {
+          setSupabaseStoreClosed(!!data.is_closed);
+          setSupabaseClosureMessage(data.closure_message || null);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch store status from Supabase:', err);
+      }
+    };
+
+    fetchSupabaseStoreStatus();
+  }, [vendor]);
+
   const filteredProducts = selectedCategory === 'all' 
     ? products 
     : products.filter(p => p.category === selectedCategory);
@@ -156,16 +230,18 @@ export default function Storefront() {
     { id: 'other', label: language === 'ar' ? 'أخرى' : 'Other', icon: Package },
   ] as { id: ProductCategory | 'all'; label: string; icon: any }[]).filter(cat => cat.id === 'all' || activeCategories.includes(cat.id));
 
-  const addToCart = (product: Product, selectedAddons: Addon[] = [], selectedSize?: Size) => {
+  const addToCart = (product: Product, selectedAddons: Addon[] = [], selectedSize?: Size, cakeSpecs?: any) => {
     setCart(prev => {
       // Create a unique key for the combination of product + addons + size
       const addonIds = [...selectedAddons].sort((a, b) => a.id.localeCompare(b.id)).map(a => a.id).join(',');
       const sizeId = selectedSize?.id || 'none';
+      const cakeSpecsId = cakeSpecs ? JSON.stringify(cakeSpecs) : 'none';
       
       const existing = prev.find(item => 
         item.product.id === product.id && 
         [...item.selectedAddons].sort((a, b) => a.id.localeCompare(b.id)).map(a => a.id).join(',') === addonIds &&
-        (item.selectedSize?.id || 'none') === sizeId
+        (item.selectedSize?.id || 'none') === sizeId &&
+        JSON.stringify(item.cakeSpecs || null) === JSON.stringify(cakeSpecs || null)
       );
       
       if (existing) {
@@ -178,12 +254,14 @@ export default function Storefront() {
         quantity: 1, 
         selectedAddons, 
         selectedSize,
-        cartId: Math.random().toString(36).substr(2, 9) 
+        cartId: Math.random().toString(36).substr(2, 9),
+        cakeSpecs: cakeSpecs || null
       }];
     });
     setAddonProduct(null);
     setTempSelectedAddons([]);
     setTempSelectedSize(null);
+    setTempCakeSpecs(null);
   };
 
   const removeFromCart = (cartId: string) => {
@@ -191,7 +269,9 @@ export default function Storefront() {
   };
 
   const cartTotal = cart.reduce((acc, item) => {
-    const basePrice = item.selectedSize ? item.selectedSize.price : item.product.price;
+    const basePrice = item.selectedSize 
+      ? item.selectedSize.price 
+      : (item.cakeSpecs ? item.cakeSpecs.calculatedPrice : item.product.price);
     const productBase = basePrice * item.quantity;
     const addonsCost = item.selectedAddons.reduce((sum, a) => sum + a.price, 0) * item.quantity;
     return acc + productBase + addonsCost;
@@ -203,6 +283,9 @@ export default function Storefront() {
     setIsSubmitting(true);
 
     try {
+      // Find cake specs if any
+      const mainCakeSpecs = cart.find(item => item.cakeSpecs)?.cakeSpecs || {};
+
       // 1. Create the order
       const orderRef = await addDoc(collection(db, 'orders'), {
         vendorId: vendor.id,
@@ -213,13 +296,17 @@ export default function Storefront() {
         scheduledPickupTime: formData.pickupOption === 'scheduled' ? formData.scheduledPickupTime : null,
         notifyWhenReady: formData.notifyWhenReady,
         receiptUrl: receiptImage,
+        cake_specs: mainCakeSpecs, // Compatible with top-level cake_specs column
         items: cart.map(item => ({
           productId: item.product.id,
           name: item.product.name,
-          price: item.selectedSize ? item.selectedSize.price : item.product.price,
+          price: item.selectedSize 
+            ? item.selectedSize.price 
+            : (item.cakeSpecs ? item.cakeSpecs.calculatedPrice : item.product.price),
           quantity: item.quantity,
           selectedAddons: item.selectedAddons,
-          selectedSize: item.selectedSize || null
+          selectedSize: item.selectedSize || null,
+          cakeSpecs: item.cakeSpecs || null
         })),
         total: cartTotal,
         status: 'pending',
@@ -276,7 +363,15 @@ export default function Storefront() {
     (vendor.subscriptionEndDate && new Date(vendor.subscriptionEndDate) < new Date())
   );
 
-  const isManuallyClosed = vendor && !!vendor.isClosedByUser;
+  const isClosed = supabaseStoreClosed !== null 
+    ? supabaseStoreClosed 
+    : (vendor?.isClosedByUser || (vendor as any)?.is_closed || false);
+
+  const closureMessage = supabaseClosureMessage 
+    ? supabaseClosureMessage 
+    : ((vendor as any)?.closure_message || (language === 'ar' 
+        ? 'يقوم المتجر حالياً بتجهيز دفعات جديدة من المنتجات أو استكمال الطلبات القائمة. يرجى العودة لزيارتنا قريباً!' 
+        : 'The store is currently preparing fresh batches or processing current orders. We will be back online very soon!'));
 
   if (isExpired) {
     return (
@@ -293,34 +388,6 @@ export default function Storefront() {
               {language === 'ar' 
                 ? 'عذراً، هذا المتجر غير نشط حالياً لانتهاء فترة التجربة أو الاشتراك. يرجى التواصل مع إدارة المحل أو المحاولة لاحقاً.' 
                 : 'Sorry, this store is temporarily inactive due to subscription expiry. Please contact the store owner or try again later.'}
-            </p>
-          </div>
-          <button 
-            onClick={() => navigate('/')}
-            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
-          >
-            {language === 'ar' ? 'الرجوع للرئيسية' : 'Go Home'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isManuallyClosed) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-white max-w-md w-full p-8 rounded-[2rem] shadow-xl border border-slate-100 text-center space-y-6">
-          <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 mx-auto shadow-inner">
-            <Coffee className="w-10 h-10" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-              {language === 'ar' ? 'المتجر مغلق مؤقتاً ☕️' : 'Taking a Quick Break ☕️'}
-            </h1>
-            <p className="text-slate-500 font-medium text-sm leading-relaxed">
-              {language === 'ar' 
-                ? 'يقوم المتجر حالياً بتجهيز دفعات جديدة من المنتجات أو استكمال الطلبات القائمة. يرجى العودة لزيارتنا قريباً!' 
-                : 'The store is currently preparing fresh batches or processing current orders. We will be back online very soon!'}
             </p>
           </div>
           <button 
@@ -448,6 +515,27 @@ export default function Storefront() {
       </div>
 
       <main className="max-w-xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
+        {/* Store Closure Banner */}
+        {isClosed && (
+          <div className="bg-rose-50 border border-rose-100 rounded-[2rem] p-6 shadow-xl shadow-rose-100/20 mb-6 flex items-start gap-4 text-right rtl:text-right">
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center shrink-0 shadow-inner text-xl">
+              📢
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <h2 className="text-lg font-black text-rose-950">
+                {language === 'ar' ? 'المتجر مغلق مؤقتاً' : 'Store Closed Temporarily'}
+              </h2>
+              <p className="text-sm font-semibold text-rose-700 leading-relaxed">
+                {closureMessage}
+              </p>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[10px] font-black uppercase tracking-wider mt-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                <span>{language === 'ar' ? 'الطلبات معطلة' : 'Orders Disabled'}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Description & Social Card */}
         <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-xl shadow-slate-200/30 mb-8 border border-slate-100/50">
           <p className="text-slate-600 font-medium leading-relaxed text-center text-base sm:text-sm">
@@ -554,23 +642,26 @@ export default function Storefront() {
                       </div>
 
                       <button
-                        disabled={product.stock !== undefined && product.stock < 0}
+                        disabled={(product.stock !== undefined && product.stock < 0) || isClosed}
                         onClick={() => {
-                          if ((product.addons && product.addons.length > 0) || (product.sizes && product.sizes.length > 0)) {
+                          if ((product.addons && product.addons.length > 0) || (product.sizes && product.sizes.length > 0) || product.is_custom_cake) {
                             setAddonProduct(product);
                             setTempSelectedAddons([]);
                             setTempSelectedSize(product.sizes?.[0] || null);
+                            setTempCakeSpecs(null); // Reset cake specs
                           } else {
                             addToCart(product);
                           }
                         }}
                         className={`w-full py-2.5 sm:py-3.5 rounded-xl sm:rounded-3xl font-black text-[10px] sm:text-[10px] uppercase tracking-wider sm:tracking-[0.2em] flex items-center justify-center gap-1 sm:gap-3 transition-all active:scale-95 shadow-lg ${
-                          product.stock !== undefined && product.stock < 0
+                          (product.stock !== undefined && product.stock < 0) || isClosed
                             ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
                             : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-slate-200'
                         }`}
                       >
-                        {product.stock !== undefined && product.stock < 0 ? (
+                        {isClosed ? (
+                          language === 'ar' ? 'المتجر مغلق' : 'Store Closed'
+                        ) : product.stock !== undefined && product.stock < 0 ? (
                           t('store.outOfStock')
                         ) : (
                           <>
@@ -646,6 +737,21 @@ export default function Storefront() {
               </button>
 
               <div className="mb-8">
+                {/* Store Closure Safeguard Banner inside Modal */}
+                {isClosed && (
+                  <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 text-rose-800 text-xs font-semibold rtl:flex-row-reverse text-right rtl:text-right">
+                    <span className="text-lg">📢</span>
+                    <div className="space-y-0.5">
+                      <p className="font-black text-rose-950">
+                        {language === 'ar' ? 'المتجر مغلق مؤقتاً' : 'Store is Closed'}
+                      </p>
+                      <p className="text-rose-600 font-medium leading-relaxed">
+                        {closureMessage}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-4 items-start mb-6">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 flex-shrink-0">
                     <img 
@@ -658,10 +764,22 @@ export default function Storefront() {
                   <div>
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">{addonProduct.name}</h2>
                     <p className="text-indigo-600 font-black">
-                      {(tempSelectedSize ? tempSelectedSize.price : addonProduct.price)} BHD
+                      {addonProduct.is_custom_cake && tempCakeSpecs
+                        ? `${tempCakeSpecs.calculatedPrice} BHD`
+                        : `${(tempSelectedSize ? tempSelectedSize.price : addonProduct.price)} BHD`
+                      }
                     </p>
                   </div>
                 </div>
+
+                {/* Custom Cake Specifications Form */}
+                {addonProduct.is_custom_cake && (
+                  <CakeSpecsForm
+                    product={addonProduct}
+                    onChange={setTempCakeSpecs}
+                    language={language}
+                  />
+                )}
 
                 {/* Sizes Selection with Interactive Icons */}
                 {addonProduct.sizes && addonProduct.sizes.length > 0 && (
@@ -764,13 +882,26 @@ export default function Storefront() {
               </div>
 
               <button
-                onClick={() => addToCart(addonProduct, tempSelectedAddons, tempSelectedSize || undefined)}
-                className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl transition-all active:scale-95 hover:bg-indigo-600"
+                disabled={isClosed}
+                onClick={() => addToCart(addonProduct, tempSelectedAddons, tempSelectedSize || undefined, tempCakeSpecs)}
+                className={`w-full font-black py-5 rounded-2xl shadow-xl transition-all active:scale-95 text-white ${
+                  isClosed
+                    ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
+                    : 'bg-slate-900 hover:bg-indigo-600'
+                }`}
               >
-                {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'} • {(
-                  (tempSelectedSize ? tempSelectedSize.price : addonProduct.price) + 
-                  tempSelectedAddons.reduce((s, a) => s + a.price, 0)
-                ).toFixed(2)} BHD
+                {isClosed ? (
+                  language === 'ar' ? 'المتجر مغلق' : 'Store Closed'
+                ) : (
+                  <>
+                    {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'} • {(
+                      (addonProduct.is_custom_cake && tempCakeSpecs
+                        ? tempCakeSpecs.calculatedPrice
+                        : (tempSelectedSize ? tempSelectedSize.price : addonProduct.price)) + 
+                      tempSelectedAddons.reduce((s, a) => s + a.price, 0)
+                    ).toFixed(2)} BHD
+                  </>
+                )}
               </button>
             </motion.div>
           </div>
@@ -819,6 +950,16 @@ export default function Storefront() {
                               + {item.selectedAddons.map(a => a.name).join(', ')}
                             </p>
                           )}
+                          {item.cakeSpecs && (
+                            <div className="mt-1.5 p-2 bg-slate-50 border border-slate-100 rounded-xl space-y-0.5 text-slate-600 text-xs text-right rtl:text-right">
+                              <p className="font-bold text-slate-700 mb-1">{language === 'ar' ? 'تفاصيل الكيكة:' : 'Cake Specifications:'}</p>
+                              <p><span className="font-semibold text-slate-500">{language === 'ar' ? 'الوزن:' : 'Weight:'}</span> {item.cakeSpecs.weightKg} {language === 'ar' ? 'كجم' : 'kg'}</p>
+                              <p><span className="font-semibold text-slate-500">{language === 'ar' ? 'النكهة:' : 'Flavor:'}</span> {item.cakeSpecs.flavor}</p>
+                              {item.cakeSpecs.writing && (
+                                <p className="italic"><span className="font-semibold text-slate-500">{language === 'ar' ? 'الكتابة:' : 'Writing:'}</span> "{item.cakeSpecs.writing}"</p>
+                              )}
+                            </div>
+                          )}
                           {item.product.madeToOrder && (
                             <p className="text-[10px] text-purple-600 font-black mt-0.5 flex items-center gap-1 rtl:flex-row-reverse">
                               <Clock className="w-3 h-3" />
@@ -829,7 +970,10 @@ export default function Storefront() {
                       </div>
                       <div className="text-right rtl:text-left">
                         <p className="font-bold">
-                          {((item.selectedSize ? item.selectedSize.price : item.product.price) + item.selectedAddons.reduce((s, a) => s + a.price, 0)) * item.quantity} BHD
+                          {((item.selectedSize 
+                            ? item.selectedSize.price 
+                            : (item.cakeSpecs ? item.cakeSpecs.calculatedPrice : item.product.price)) 
+                            + item.selectedAddons.reduce((s, a) => s + a.price, 0)) * item.quantity} BHD
                         </p>
                         <button 
                           onClick={() => removeFromCart(item.cartId)}
