@@ -1,3 +1,4 @@
 {
-  "name": "jareeb"
+  "name": "jareeb",
+  "pages_build_output_dir": "./dist"
 }
