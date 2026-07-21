@@ -26,6 +26,7 @@ export interface Vendor {
   plan?: SubscriptionPlan;
   subscriptionStatus?: 'active' | 'expired' | 'trial';
   subscriptionEndDate?: string;
+  aiCredits?: number;
   createdAt: string;
   pickupRegion?: string;
   pickupTimes?: string;

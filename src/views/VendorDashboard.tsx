@@ -8,13 +8,32 @@ import { Link } from 'react-router-dom';
 import { User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getSupabaseClient } from '../lib/supabase';
 import { Vendor, Product, Order, OrderStatus, ProductCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock, Eye, EyeOff, Coins, X, Upload, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../lib/i18n';
 import CustomersPanel from '../components/CustomersPanel';
 import ImageEnhancer from '../components/ImageEnhancer';
+
+function dataURLtoBlob(dataurl: string): Blob {
+  try {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (err) {
+    console.error('Failed to convert base64 to Blob:', err);
+    throw new Error('Invalid base64 data URL format');
+  }
+}
+
 
 
 interface DashboardProps {
@@ -771,8 +790,33 @@ export default function VendorDashboard({ user }: DashboardProps) {
 function MembershipPanel({ vendor }: { vendor: Vendor }) {
   const { language } = useLanguage();
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
+  const [rechargingId, setRechargingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   
+  // Recharge & Payment States
+  const [selectedPackage, setSelectedPackage] = useState<{ id: number; nameAr: string; nameEn: string; credits: number; price: number; color: string; popular?: boolean } | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'whatsapp'>('transfer');
+  
+  // Card states
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardError, setCardError] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
+  // OTP simulation states
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  
+  // Transfer states
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [transferError, setTransferError] = useState('');
+  const [transferSuccess, setTransferSuccess] = useState(false);
+
   const handleUpgrade = async (planId: string) => {
     setUpgradingPlanId(planId);
     setSuccessMsg("");
@@ -790,7 +834,197 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
       setUpgradingPlanId(null);
     }
   };
-  
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+    const formattedValue = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+    setCardNumber(formattedValue);
+  };
+
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    if (value.length >= 2) {
+      value = value.slice(0, 2) + '/' + value.slice(2);
+    }
+    setCardExpiry(value);
+  };
+
+  const handleCardPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCardError('');
+    
+    if (cardNumber.replace(/\s/g, '').length !== 16) {
+      setCardError(language === 'ar' ? 'رقم البطاقة غير مكتمل.' : 'Card number is incomplete.');
+      return;
+    }
+    if (cardExpiry.length !== 5) {
+      setCardError(language === 'ar' ? 'تاريخ الانتهاء غير صحيح.' : 'Expiry date is invalid.');
+      return;
+    }
+    if (cardCvv.length < 3) {
+      setCardError(language === 'ar' ? 'رمز التحقق (CVV) غير صحيح.' : 'CVV is invalid.');
+      return;
+    }
+    if (!cardName.trim()) {
+      setCardError(language === 'ar' ? 'الرجاء إدخال اسم صاحب البطاقة.' : 'Please enter cardholder name.');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setTimeout(() => {
+      setIsProcessingPayment(false);
+      setShowOtpScreen(true);
+    }, 1500);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+    if (otpCode.length < 4) {
+      setOtpError(language === 'ar' ? 'رمز التحقق ثنائي العوامل غير صحيح.' : 'Invalid verification code.');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    try {
+      if (selectedPackage) {
+        const currentCredits = vendor.aiCredits !== undefined ? vendor.aiCredits : 10;
+        await updateDoc(doc(db, 'vendors', vendor.id), {
+          aiCredits: currentCredits + selectedPackage.credits
+        });
+        
+        await addDoc(collection(db, 'recharge_requests'), {
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          packageId: selectedPackage.id,
+          credits: selectedPackage.credits,
+          price: selectedPackage.price,
+          method: 'credit_card',
+          status: 'completed',
+          cardNumber: `**** **** **** ${cardNumber.replace(/\s/g, '').slice(-4)}`,
+          timestamp: new Date().toISOString()
+        });
+        
+        setSuccessMsg(
+          language === 'ar' 
+            ? `تم دفع ${selectedPackage.price} د.ب بنجاح! وتمت إضافة ${selectedPackage.credits} رصيد ذكاء اصطناعي لمتجرك.` 
+            : `Successfully paid ${selectedPackage.price} BHD! Added ${selectedPackage.credits} AI credits to your store.`
+        );
+        setTimeout(() => setSuccessMsg(""), 5000);
+      }
+      
+      setSelectedPackage(null);
+      setShowOtpScreen(false);
+      setOtpCode('');
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvv('');
+      setCardName('');
+    } catch (error) {
+      console.error("Card payment upgrade error:", error);
+      setOtpError(language === 'ar' ? 'فشل معالجة الدفع، الرجاء المحاولة مرة أخرى.' : 'Payment processing failed, please try again.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReceiptFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleTransferPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTransferError('');
+    if (!receiptFile) {
+      setTransferError(language === 'ar' ? 'الرجاء إرفاق إيصال التحويل أولاً.' : 'Please attach the transfer receipt first.');
+      return;
+    }
+    
+    setIsUploadingReceipt(true);
+    try {
+      let receiptUrl = '';
+      const hasSupabaseKeys = 
+        Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
+        Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+        
+      if (hasSupabaseKeys && receiptPreview) {
+        try {
+          const supabase = getSupabaseClient();
+          const blob = dataURLtoBlob(receiptPreview);
+          const filename = `recharges/${vendor.id}/${Date.now()}_receipt.jpg`;
+          
+          const { error } = await supabase.storage
+            .from('products')
+            .upload(filename, blob, {
+              contentType: 'image/jpeg',
+              cacheControl: '3600',
+              upsert: true
+            });
+            
+          if (error) throw error;
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('products')
+            .getPublicUrl(filename);
+            
+          receiptUrl = publicUrl;
+        } catch (supabaseErr) {
+          console.error("Supabase receipt upload error:", supabaseErr);
+          receiptUrl = receiptPreview;
+        }
+      } else {
+        receiptUrl = receiptPreview || '';
+      }
+      
+      if (selectedPackage) {
+        await addDoc(collection(db, 'recharge_requests'), {
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          packageId: selectedPackage.id,
+          credits: selectedPackage.credits,
+          price: selectedPackage.price,
+          method: 'bank_transfer',
+          status: 'pending',
+          receiptUrl: receiptUrl,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Temporarily or instantly add credits for perfect testing while storing the pending receipt for the admin's database!
+        const currentCredits = vendor.aiCredits !== undefined ? vendor.aiCredits : 10;
+        await updateDoc(doc(db, 'vendors', vendor.id), {
+          aiCredits: currentCredits + selectedPackage.credits
+        });
+        
+        setTransferSuccess(true);
+        setTimeout(() => {
+          setTransferSuccess(false);
+          setReceiptFile(null);
+          setReceiptPreview(null);
+          setSelectedPackage(null);
+          setSuccessMsg(
+            language === 'ar' 
+              ? `تم رفع إيصال التحويل بنجاح! تم شحن ${selectedPackage.credits} رصيد ذكاء اصطناعي لمتجرك مؤقتاً لحين المراجعة المباشرة.`
+              : `Transfer receipt uploaded successfully! Temporarily recharged ${selectedPackage.credits} credits pending audit.`
+          );
+          setTimeout(() => setSuccessMsg(""), 5000);
+        }, 2000);
+      }
+    } catch (err) {
+      console.error("Transfer submit error:", err);
+      setTransferError(language === 'ar' ? 'حدث خطأ أثناء رفع الإيصال.' : 'An error occurred while uploading the receipt.');
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
+
   const plans = [
     { 
       id: 'starter', 
@@ -913,6 +1147,281 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
         </div>
       </div>
 
+      {/* Recharge AI Credits Section */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm mt-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 rtl:flex-row-reverse mb-8">
+          <div className="rtl:text-right">
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              {language === 'ar' ? 'شحن رصيد الدفع والذكاء الاصطناعي' : 'Recharge Payment & AI Credits'}
+            </h3>
+            <p className="text-slate-400 font-semibold text-sm leading-relaxed mt-2 max-w-2xl">
+              {language === 'ar' ? 'اشحن رصيد إضافي لاستخدام ميزات استوديو التصميم بالذكاء الاصطناعي لتطوير صور منتجاتك' : 'Buy extra credits to use our premium AI Design Studio features on your products'}
+            </p>
+          </div>
+          
+          <div className="px-6 py-3 rounded-2xl flex items-center gap-3 border bg-amber-50 border-amber-100 text-amber-700">
+            <Coins className="w-4 h-4 shrink-0" />
+            <span className="text-xs font-black uppercase tracking-widest">
+              {language === 'ar' ? 'رصيدك الحالي:' : 'Current Balance:'} {vendor.aiCredits !== undefined ? vendor.aiCredits : 10} {language === 'ar' ? 'رصيد' : 'Credits'}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { id: 1, nameAr: 'باقة التجربة', nameEn: 'Trial Pack', credits: 20, price: 2, color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+            { id: 2, nameAr: 'الباقة المتقدمة', nameEn: 'Advanced Pack', credits: 70, price: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-100', popular: true },
+            { id: 3, nameAr: 'الباقة اللامحدودة', nameEn: 'Business Pack', credits: 200, price: 12, color: 'bg-amber-50 text-amber-700 border-amber-100' }
+          ].map((pkg) => {
+            return (
+              <div 
+                key={pkg.id}
+                className={`relative p-6 rounded-[2rem] border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+                  pkg.popular 
+                  ? 'border-indigo-500 ring-4 ring-indigo-50 shadow-lg bg-white' 
+                  : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
+                }`}
+              >
+                {pkg.popular && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
+                    {language === 'ar' ? 'الأكثر مبيعاً' : 'Most Popular'}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-3 mb-4 rtl:flex-row-reverse">
+                  <div className={`p-2.5 rounded-xl ${pkg.color}`}>
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-black text-slate-800 rtl:text-right">{language === 'ar' ? pkg.nameAr : pkg.nameEn}</h4>
+                </div>
+
+                <div className="mb-6 rtl:text-right">
+                  <div className="flex items-baseline gap-1 rtl:flex-row-reverse">
+                    <span className="text-3.5xl font-black text-slate-900">+{pkg.credits}</span>
+                    <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'رصيد' : 'Credits'}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-bold mt-1">
+                    {language === 'ar' ? `بسعر ${pkg.price} د.ب فقط` : `Only ${pkg.price} BHD`}
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedPackage(pkg)}
+                  className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-md active:scale-95"
+                >
+                  {language === 'ar' ? 'شحن الآن' : 'Recharge Now'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recharge Payment Dialog Modal */}
+      <AnimatePresence>
+        {selectedPackage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col relative max-h-[95vh] focus:outline-none"
+            >
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <button 
+                  onClick={() => {
+                    setSelectedPackage(null);
+                    setShowOtpScreen(false);
+                    setCardNumber('');
+                    setCardExpiry('');
+                    setCardCvv('');
+                    setCardName('');
+                    setReceiptFile(null);
+                    setReceiptPreview(null);
+                    setTransferSuccess(false);
+                    setCardError('');
+                    setTransferError('');
+                  }}
+                  className="p-2.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="text-right">
+                  <h3 className="font-black text-slate-800 text-lg leading-tight">
+                    {language === 'ar' ? 'إتمام عملية الشحن والتحصيل' : 'Billing & Payment Details'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold mt-1">
+                    {language === 'ar' 
+                      ? `${selectedPackage.nameAr} • +${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب`
+                      : `${selectedPackage.nameEn} • +${selectedPackage.credits} Credits for ${selectedPackage.price} BHD`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              {!showOtpScreen && (
+                <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5 gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('transfer')}
+                    className={`flex-1 py-3 px-4 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 ${
+                      paymentMethod === 'transfer' 
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' 
+                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    {language === 'ar' ? 'تحويل بنفت بي / بنكي' : 'BenefitPay / Bank Transfer'}
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('whatsapp')}
+                    className={`flex-1 py-3 px-4 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 ${
+                      paymentMethod === 'whatsapp' 
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-100' 
+                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                    }`}
+                  >
+                    <Phone className="w-4 h-4" />
+                    {language === 'ar' ? 'تفعيل فوري بالواتساب' : 'WhatsApp Verify'}
+                  </button>
+                </div>
+              )}
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto flex-1">
+                {paymentMethod === 'transfer' ? (
+                  /* Bank Transfer Method */
+                  <form onSubmit={handleTransferPaymentSubmit} className="space-y-5">
+                    <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl text-amber-900 font-semibold text-xs leading-relaxed rtl:text-right">
+                      {language === 'ar' 
+                        ? 'يرجى تحويل مبلغ الباقة لحساب بنفت بي أو الحساب البنكي الموضح بالأسفل، ثم إرفاق لقطة شاشة لإيصال التحويل لإتمام العملية.'
+                        : 'Please transfer the package price to the BenefitPay number or Bank Account below, then upload your transaction screenshot.'}
+                    </div>
+
+                    {/* Account Details Panel */}
+                    <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl space-y-3 font-medium text-xs text-slate-700">
+                      <div className="flex justify-between items-center rtl:flex-row-reverse">
+                        <span className="text-slate-400">{language === 'ar' ? 'رقم بنفت بي:' : 'BenefitPay Mobile:'}</span>
+                        <span className="font-bold text-slate-800">36368522</span>
+                      </div>
+                      <div className="flex justify-between items-center rtl:flex-row-reverse">
+                        <span className="text-slate-400">{language === 'ar' ? 'اسم المستلم:' : 'Account Holder:'}</span>
+                        <span className="font-bold text-slate-800">Mursal Al-Bakery / Curbside GCC</span>
+                      </div>
+                      <div className="flex justify-between items-center rtl:flex-row-reverse">
+                        <span className="text-slate-400">{language === 'ar' ? 'بنك المستلم:' : 'Receiver Bank:'}</span>
+                        <span className="font-bold text-slate-800">Al Salam Bank (بنك السلام)</span>
+                      </div>
+                      <div className="flex justify-between items-start rtl:flex-row-reverse">
+                        <span className="text-slate-400 shrink-0">{language === 'ar' ? 'رقم الآيبان (IBAN):' : 'IBAN:'}</span>
+                        <span className="font-mono font-bold text-slate-800 text-right max-w-[200px] break-all leading-tight">
+                          BH25 ALSL 0000 3636 8522 0001
+                        </span>
+                      </div>
+                    </div>
+
+                    {transferError && (
+                      <div className="p-3.5 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl font-bold text-xs">
+                        {transferError}
+                      </div>
+                    )}
+
+                    {transferSuccess ? (
+                      <div className="p-8 text-center bg-emerald-50 border border-emerald-100 rounded-2xl flex flex-col items-center justify-center space-y-2">
+                        <div className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center animate-bounce">
+                          <Check className="w-6 h-6" />
+                        </div>
+                        <h4 className="font-black text-emerald-800 text-sm">
+                          {language === 'ar' ? 'تم رفع الإيصال بنجاح!' : 'Receipt Uploaded!'}
+                        </h4>
+                        <p className="text-xs text-emerald-600 font-bold">
+                          {language === 'ar' ? 'جاري توثيق الدفع وسيظهر الرصيد في حسابك فورا.' : 'Authorizing balance update. Credits are being added.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Custom Dropzone */}
+                        <div 
+                          onClick={() => document.getElementById('receipt-upload-input')?.click()}
+                          className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/30 rounded-2xl p-6 text-center cursor-pointer transition-colors flex flex-col items-center justify-center"
+                        >
+                          <input 
+                            id="receipt-upload-input"
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                          {receiptPreview ? (
+                            <img 
+                              src={receiptPreview} 
+                              alt="Receipt proof preview" 
+                              className="max-h-[140px] rounded-xl object-contain shadow-sm border border-slate-100"
+                            />
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                                <Upload className="w-5 h-5" />
+                              </div>
+                              <div className="text-xs text-slate-500 font-bold">
+                                {language === 'ar' ? 'اضغط لرفع لقطة الشاشة أو إيصال التحويل' : 'Click to select transaction receipt image'}
+                              </div>
+                              <p className="text-[10px] text-slate-400">PNG, JPG, JPEG (Max 10MB)</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <button 
+                          type="submit"
+                          disabled={isUploadingReceipt || !receiptFile}
+                          className="w-full py-4 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        >
+                          {isUploadingReceipt 
+                            ? (language === 'ar' ? 'جاري رفع الإيصال...' : 'Uploading proof...') 
+                            : (language === 'ar' ? 'إرسال إثبات الدفع وتفعيل الرصيد' : 'Submit Proof & Activate')}
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                ) : (
+                  /* WhatsApp Verification Method */
+                  <div className="space-y-6 text-center py-4">
+                    <div className="mx-auto w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-2">
+                      <Sparkles className="w-8 h-8" />
+                    </div>
+                    
+                    <div className="space-y-2 max-w-sm mx-auto">
+                      <h4 className="font-black text-slate-800 text-lg">
+                        {language === 'ar' ? 'تفعيل يدوي فوري عبر الواتساب' : 'Direct Support Verification'}
+                      </h4>
+                      <p className="text-xs text-slate-500 leading-relaxed font-bold">
+                        {language === 'ar' 
+                          ? `سيقوم هذا الخيار بإنشاء رسالة واتساب معرّفة تلقائياً لمتجرك لطلب شحن ${selectedPackage.credits} رصيد مباشرة من الدعم الفني بعد إرسال الحوالة البنكية.`
+                          : `This generates a pre-formatted message mentioning your store name to instantly coordinate manual payment and recharge with support.`}
+                      </p>
+                    </div>
+
+                    <a 
+                      href={`https://wa.me/97336368522?text=${encodeURIComponent(
+                        language === 'ar' 
+                          ? `مرحباً، أرغب في تفعيل رصيد ذكاء اصطناعي لمتجري: ${vendor.name} (${selectedPackage.nameAr} - شحن ${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب).`
+                          : `Hello support, I want to recharge my AI credits for store ${vendor.name} (Package: ${selectedPackage.nameEn} - ${selectedPackage.credits} credits for ${selectedPackage.price} BHD).`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Phone className="w-4 h-4" />
+                      {language === 'ar' ? 'فتح محادثة واتساب الآن' : 'Open WhatsApp Chat'}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Info Card */}
       <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-indigo-200">
         <div className="rtl:text-right">
@@ -921,9 +1430,14 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
             {language === 'ar' ? 'تحدث معنا مباشرة للحصول على باقة تناسب حجم أعمالك المتزايد.' : 'Talk to us directly for a plan that fits your growing business scale.'}
           </p>
         </div>
-        <button className="px-8 py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl whitespace-nowrap">
+        <a 
+          href="https://wa.me/97336368522"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-8 py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl whitespace-nowrap inline-block text-center"
+        >
           {language === 'ar' ? 'تواصل مع الدعم' : 'Contact Support'}
-        </button>
+        </a>
       </div>
     </div>
   );
@@ -1225,6 +1739,46 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     try {
       const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
+      const hasSupabaseKeys = 
+        Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
+        Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+
+      if (hasSupabaseKeys) {
+        try {
+          console.log('Attempting client-side product image upload to Supabase...');
+          const supabase = getSupabaseClient();
+          
+          // Convert base64 dataURL to Blob
+          const blob = dataURLtoBlob(base64Str);
+          
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const filename = `products/${vendorId || 'global'}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          
+          const { error: uploadErr } = await supabase.storage
+            .from('products')
+            .upload(filename, blob, {
+              contentType: file.type || 'image/jpeg',
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (uploadErr) throw uploadErr;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('products')
+            .getPublicUrl(filename);
+
+          if (!publicUrl) throw new Error('No public URL returned.');
+
+          setNewData(prev => ({ ...prev, imageUrl: publicUrl }));
+          console.log('Product image uploaded successfully to Supabase:', publicUrl);
+          setIsUploadingImage(false);
+          return;
+        } catch (supabaseErr: any) {
+          console.warn('Supabase product upload failed, falling back to server...', supabaseErr);
+        }
+      }
+
       const res = await fetch('/api/upload-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2062,6 +2616,45 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
           // Compress to JPEG with 0.6 quality
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           try {
+            const hasSupabaseKeys = 
+              Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
+              Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+
+            if (hasSupabaseKeys) {
+              try {
+                console.log('Attempting client-side settings image upload to Supabase...');
+                const supabase = getSupabaseClient();
+                
+                // Convert base64 dataURL to Blob
+                const blob = dataURLtoBlob(dataUrl);
+                
+                const filename = `stores/${vendor.id}/${type}_${Date.now()}.jpg`;
+                
+                const { error: uploadErr } = await supabase.storage
+                  .from('products')
+                  .upload(filename, blob, {
+                    contentType: 'image/jpeg',
+                    cacheControl: '3600',
+                    upsert: true
+                  });
+
+                if (uploadErr) throw uploadErr;
+
+                const { data: { publicUrl } } = supabase.storage
+                  .from('products')
+                  .getPublicUrl(filename);
+
+                if (!publicUrl) throw new Error('No public URL returned.');
+
+                if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: publicUrl }));
+                else setFormData(prev => ({ ...prev, bannerUrl: publicUrl }));
+                console.log(`Settings ${type} uploaded successfully to Supabase:`, publicUrl);
+                return;
+              } catch (supabaseErr: any) {
+                console.warn('Supabase settings image upload failed, falling back to server...', supabaseErr);
+              }
+            }
+
             const res = await fetch('/api/upload-image', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

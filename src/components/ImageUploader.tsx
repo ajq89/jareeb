@@ -115,8 +115,17 @@ export default function ImageUploader({
     try {
       // 4. Generate Unique File Name
       const cleanExt = getCleanExtension(file.name);
-      const sanitizedStoreId = storeId.replace(/[^a-zA-Z0-9-_]/g, "");
-      const uniqueFilename = `${sanitizedStoreId}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${cleanExt}`;
+      const sanitizedStoreId = storeId.replace(/[^a-zA-Z0-9-_]/g, "") || "global";
+      let uniqueFilename = `${sanitizedStoreId}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${cleanExt}`;
+      
+      // Clean up path from any accidental multiple slashes and leading/trailing slashes
+      uniqueFilename = uniqueFilename.replace(/\/+/g, "/");
+      if (uniqueFilename.startsWith("/")) {
+        uniqueFilename = uniqueFilename.substring(1);
+      }
+      if (uniqueFilename.endsWith("/")) {
+        uniqueFilename = uniqueFilename.slice(0, -1);
+      }
 
       const supabase = getSupabaseClient();
 
@@ -132,32 +141,66 @@ export default function ImageUploader({
       }, 150);
 
       // 5. Execute Supabase Storage Upload
-      const { data, error } = await supabase.storage
-        .from("products")
-        .upload(uniqueFilename, file, {
-          cacheControl: "3600",
-          upsert: false,
+      try {
+        const { data, error } = await supabase.storage
+          .from("products")
+          .upload(uniqueFilename, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        setUploadProgress(100);
+
+        // 6. Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from("products")
+          .getPublicUrl(uniqueFilename);
+
+        if (!publicUrl) {
+          throw new Error("Unable to fetch public URL from Supabase storage bucket.");
+        }
+
+        // Fire success callback
+        onUploadSuccess(publicUrl);
+      } catch (directUploadError: any) {
+        console.warn("Direct client-side upload failed, attempting backend-side fallback upload...", directUploadError);
+        
+        const base64Str = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
         });
 
+        const res = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: base64Str,
+            vendorId: storeId,
+            type: "product"
+          })
+        });
+
+        if (!res.ok) {
+          const responseText = await res.text();
+          throw new Error(`Server fallback failed: ${responseText}`);
+        }
+
+        const serverData = await res.json();
+        if (serverData.imageUrl) {
+          setUploadProgress(100);
+          onUploadSuccess(serverData.imageUrl);
+        } else {
+          throw new Error("Server response did not include a valid image URL.");
+        }
+      }
+
       clearInterval(progressInterval);
-
-      if (error) {
-        throw error;
-      }
-
-      setUploadProgress(100);
-
-      // 6. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("products")
-        .getPublicUrl(uniqueFilename);
-
-      if (!publicUrl) {
-        throw new Error("Unable to fetch public URL from Supabase storage bucket.");
-      }
-
-      // Fire success callback
-      onUploadSuccess(publicUrl);
 
     } catch (error: any) {
       console.error("Supabase image upload failed:", error);

@@ -7,12 +7,54 @@ import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { createClient } from "@supabase/supabase-js";
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Clean environment variables helper to strip quotes
+function cleanEnvValue(val: string | undefined): string | undefined {
+  if (!val) return val;
+  let clean = val.trim();
+  if (clean.startsWith('"') && clean.endsWith('"')) {
+    clean = clean.slice(1, -1);
+  } else if (clean.startsWith("'") && clean.endsWith("'")) {
+    clean = clean.slice(1, -1);
+  }
+  return clean.trim();
+}
+
+// Initialize Supabase Admin/Service client on backend
+let serverSupabase: any = null;
+function getServerSupabaseClient() {
+  if (serverSupabase) return serverSupabase;
+  let supabaseUrl = cleanEnvValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+  const supabaseKey = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+  
+  if (supabaseUrl) {
+    // Strip sub-paths like /storage/v1 or /rest/v1 if accidentally included by user
+    if (supabaseUrl.includes("/storage/v1")) {
+      supabaseUrl = supabaseUrl.split("/storage/v1")[0];
+    }
+    if (supabaseUrl.includes("/rest/v1")) {
+      supabaseUrl = supabaseUrl.split("/rest/v1")[0];
+    }
+    // Remove trailing slashes
+    while (supabaseUrl.endsWith("/")) {
+      supabaseUrl = supabaseUrl.slice(0, -1);
+    }
+  }
+
+  if (supabaseUrl && supabaseKey) {
+    serverSupabase = createClient(supabaseUrl, supabaseKey);
+    console.log("Supabase Client successfully initialized on backend server with URL:", supabaseUrl);
+    return serverSupabase;
+  }
+  return null;
+}
 
 // Initialize Firebase Admin using the configuration json in workspace root
 let db: Firestore | null = null;
@@ -81,7 +123,7 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
     const filename = `raw_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
     let imageUrl = "";
 
-    // 1. ALWAYS SAVE LOCALLY FIRST as it is the most reliable
+    // 1. ALWAYS SAVE LOCALLY FIRST as a reliable local cache
     try {
       const uploadsDir = path.join(process.cwd(), "public", "uploads");
       await fs.mkdir(uploadsDir, { recursive: true });
@@ -92,33 +134,102 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
       imageUrl = `/uploads/${filename}`;
     } catch (fsErr: any) {
       console.error("CRITICAL: Failed to save image locally:", fsErr);
-      // We don't throw yet, we will try Firebase next if available
     }
 
-    // 2. TRY FIREBASE STORAGE in a separate block
-    if (vendorId && bucket) {
+    // 2. PRIORITIZE SUPABASE STORAGE UPLOAD (Highly recommended for persistence)
+    const supabaseClient = getServerSupabaseClient();
+    if (supabaseClient) {
       try {
-        console.log(`Attempting Firebase Storage upload for vendor ${vendorId}...`);
+        console.log("Attempting backend-side upload to Supabase Storage...");
+        
+        // Ensure 'products' bucket exists and is public (helps prevent 'bucket not found' or RLS policy initialization issues)
+        try {
+          const { error: createErr } = await supabaseClient.storage.createBucket("products", {
+            public: true
+          });
+          if (createErr) {
+            console.log("Bucket creation status/info (bucket 'products' probably already exists):", createErr.message);
+          } else {
+            console.log("Successfully verified or created the 'products' storage bucket");
+          }
+        } catch (bucketErr: any) {
+          console.warn("Soft warning: Bucket creation check skipped:", bucketErr.message || bucketErr);
+        }
+
+        // Dynamically route to correct folders to comply with Supabase RLS policies
+        const type = req.body.type || "";
+        let pathInBucket = "";
+        
+        const cleanVendorId = (vendorId && vendorId !== "undefined" && vendorId !== "null") ? vendorId : "global";
+
+        if (type === "logo" || type === "banner") {
+          pathInBucket = `stores/${cleanVendorId}/${type}_${Date.now()}.${extension}`;
+        } else if (!vendorId || vendorId === "undefined" || vendorId === "null") {
+          pathInBucket = `receipts/receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+        } else if (type === "enhancer") {
+          pathInBucket = `enhancer/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+        } else {
+          pathInBucket = `products/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+        }
+
+        // Clean up path from any accidental multiple slashes and leading/trailing slashes
+        pathInBucket = pathInBucket.replace(/\/+/g, "/");
+        if (pathInBucket.startsWith("/")) {
+          pathInBucket = pathInBucket.substring(1);
+        }
+        if (pathInBucket.endsWith("/")) {
+          pathInBucket = pathInBucket.slice(0, -1);
+        }
+
+        console.log(`Resolved backend upload bucket path: ${pathInBucket}`);
+
+        // Use Uint8Array to guarantee binary compatibility across JS runtimes
+        const { data, error } = await supabaseClient.storage
+          .from("products")
+          .upload(pathInBucket, new Uint8Array(buffer), {
+            contentType: imageType,
+            cacheControl: "3600",
+            upsert: true
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        const { data: { publicUrl } } = supabaseClient.storage
+          .from("products")
+          .getPublicUrl(pathInBucket);
+
+        if (publicUrl) {
+          imageUrl = publicUrl;
+          console.log(`Uploaded image to Supabase Storage via backend: ${imageUrl}`);
+        }
+      } catch (supabaseErr: any) {
+        console.error("Failed to upload image to Supabase Storage server-side:", supabaseErr.message || supabaseErr);
+      }
+    }
+
+    // 3. FALLBACK TO FIREBASE STORAGE (if Supabase upload wasn't used or failed, and Firebase is available)
+    if ((!imageUrl || !imageUrl.startsWith("http")) && vendorId && bucket) {
+      try {
+        console.log(`Attempting Firebase Storage fallback upload for vendor ${vendorId}...`);
         const file = bucket.file(`vendors/${vendorId}/${filename}`);
         
-        // Use a Promise with timeout for the save operation
         const uploadPromise = file.save(buffer, {
           metadata: { contentType: imageType },
           public: true
         });
 
-        // Set a 10s timeout for the upload
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error("Firebase Storage upload timed out")), 10000)
         );
 
         await Promise.race([uploadPromise, timeoutPromise]);
         
-        // Update imageUrl to the cloud one if successful
         imageUrl = `https://storage.googleapis.com/${bucket.name}/vendors/${vendorId}/${filename}`;
-        console.log(`Uploaded image to Firebase Storage for vendor ${vendorId}: ${imageUrl}`);
+        console.log(`Uploaded image to Firebase Storage fallback for vendor ${vendorId}: ${imageUrl}`);
       } catch (storageErr: any) {
-        console.warn("Firebase Storage upload skipped or failed. Using local path instead.", storageErr.message);
+        console.warn("Firebase Storage fallback upload skipped or failed.", storageErr.message);
       }
     }
 
@@ -302,8 +413,12 @@ async function bootstrap() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.get("*", (req, res, next) => {
+      // Skip API routes, uploaded files, and requests with file extensions to avoid MIME mismatch or file downloads
+      if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || (req.path.includes(".") && !req.path.endsWith(".html"))) {
+        return res.status(404).send("Not Found");
+      }
+      res.status(200).type("text/html; charset=utf-8").sendFile(path.join(distPath, "index.html"));
     });
   }
 

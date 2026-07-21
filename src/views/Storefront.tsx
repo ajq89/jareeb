@@ -14,6 +14,24 @@ import { useLanguage } from '../lib/i18n';
 import { getSupabaseClient } from '../lib/supabase';
 import CakeSpecsForm from '../components/CakeSpecsForm';
 
+function dataURLtoBlob(dataurl: string): Blob {
+  try {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (err) {
+    console.error('Failed to convert base64 to Blob:', err);
+    throw new Error('Invalid base64 data URL format');
+  }
+}
+
+
 export default function Storefront() {
   const { t, language, setLanguage } = useLanguage();
   const { slug } = useParams<{ slug: string }>();
@@ -102,8 +120,7 @@ export default function Storefront() {
                 const supabase = getSupabaseClient();
                 
                 // Convert base64 dataURL to Blob
-                const response = await fetch(dataUrl);
-                const blob = await response.blob();
+                const blob = dataURLtoBlob(dataUrl);
                 
                 const filename = `receipts/receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
                 
