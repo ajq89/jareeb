@@ -8,6 +8,7 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // Load environment variables
 dotenv.config();
@@ -52,6 +53,30 @@ function getServerSupabaseClient() {
     serverSupabase = createClient(supabaseUrl, supabaseKey);
     console.log("Supabase Client successfully initialized on backend server with URL:", supabaseUrl);
     return serverSupabase;
+  }
+  return null;
+}
+
+// Initialize R2 Client on backend
+let r2Client: S3Client | null = null;
+function getR2Client() {
+  if (r2Client) return r2Client;
+  
+  const endpoint = cleanEnvValue(process.env.R2_ENDPOINT || process.env.VITE_R2_ENDPOINT);
+  const accessKeyId = cleanEnvValue(process.env.R2_ACCESS_KEY_ID || process.env.VITE_R2_ACCESS_KEY_ID);
+  const secretAccessKey = cleanEnvValue(process.env.R2_SECRET_ACCESS_KEY || process.env.VITE_R2_SECRET_ACCESS_KEY);
+
+  if (endpoint && accessKeyId && secretAccessKey) {
+    r2Client = new S3Client({
+      region: "auto",
+      endpoint: endpoint,
+      credentials: {
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey,
+      },
+    });
+    console.log("R2 Client successfully initialized on backend server");
+    return r2Client;
   }
   return null;
 }
@@ -136,81 +161,112 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
       console.error("CRITICAL: Failed to save image locally:", fsErr);
     }
 
-    // 2. PRIORITIZE SUPABASE STORAGE UPLOAD (Highly recommended for persistence)
-    const supabaseClient = getServerSupabaseClient();
-    if (supabaseClient) {
+    // 2. PRIORITIZE CLOUDFLARE R2 UPLOAD
+    const r2 = getR2Client();
+    const r2Bucket = cleanEnvValue(process.env.R2_BUCKET_NAME || process.env.VITE_R2_BUCKET_NAME);
+    const r2PublicDomain = cleanEnvValue(process.env.R2_PUBLIC_DOMAIN || process.env.VITE_R2_PUBLIC_DOMAIN);
+
+    if (r2 && r2Bucket && r2PublicDomain) {
       try {
-        console.log("Attempting backend-side upload to Supabase Storage...");
-        
-        // Ensure 'products' bucket exists and is public (helps prevent 'bucket not found' or RLS policy initialization issues)
-        try {
-          const { error: createErr } = await supabaseClient.storage.createBucket("products", {
-            public: true
-          });
-          if (createErr) {
-            console.log("Bucket creation status/info (bucket 'products' probably already exists):", createErr.message);
-          } else {
-            console.log("Successfully verified or created the 'products' storage bucket");
-          }
-        } catch (bucketErr: any) {
-          console.warn("Soft warning: Bucket creation check skipped:", bucketErr.message || bucketErr);
-        }
-
-        // Dynamically route to correct folders to comply with Supabase RLS policies
-        const type = req.body.type || "";
-        let pathInBucket = "";
-        
+        console.log("Attempting backend-side upload to Cloudflare R2...");
+        const type = req.body.type || "stores";
         const cleanVendorId = (vendorId && vendorId !== "undefined" && vendorId !== "null") ? vendorId : "global";
+        const pathInBucket = `${type}/${cleanVendorId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${extension}`;
 
-        if (type === "logo" || type === "banner") {
-          pathInBucket = `stores/${cleanVendorId}/${type}_${Date.now()}.${extension}`;
-        } else if (!vendorId || vendorId === "undefined" || vendorId === "null") {
-          pathInBucket = `receipts/receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
-        } else if (type === "enhancer") {
-          pathInBucket = `enhancer/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
-        } else {
-          pathInBucket = `products/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
-        }
+        const command = new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: pathInBucket,
+          Body: buffer,
+          ContentType: imageType,
+        });
 
-        // Clean up path from any accidental multiple slashes and leading/trailing slashes
-        pathInBucket = pathInBucket.replace(/\/+/g, "/");
-        if (pathInBucket.startsWith("/")) {
-          pathInBucket = pathInBucket.substring(1);
-        }
-        if (pathInBucket.endsWith("/")) {
-          pathInBucket = pathInBucket.slice(0, -1);
-        }
+        await r2.send(command);
 
-        console.log(`Resolved backend upload bucket path: ${pathInBucket}`);
-
-        // Use Uint8Array to guarantee binary compatibility across JS runtimes
-        const { data, error } = await supabaseClient.storage
-          .from("products")
-          .upload(pathInBucket, new Uint8Array(buffer), {
-            contentType: imageType,
-            cacheControl: "3600",
-            upsert: true
-          });
-
-        if (error) {
-          throw error;
-        }
-
-        const { data: { publicUrl } } = supabaseClient.storage
-          .from("products")
-          .getPublicUrl(pathInBucket);
-
-        if (publicUrl) {
-          imageUrl = publicUrl;
-          console.log(`Uploaded image to Supabase Storage via backend: ${imageUrl}`);
-        }
-      } catch (supabaseErr: any) {
-        console.error("Failed to upload image to Supabase Storage server-side:", supabaseErr.message || supabaseErr);
+        const domain = r2PublicDomain.endsWith('/') ? r2PublicDomain.slice(0, -1) : r2PublicDomain;
+        imageUrl = `${domain}/${pathInBucket}`;
+        console.log(`Uploaded image to R2 via backend: ${imageUrl}`);
+      } catch (r2Err: any) {
+        console.error("Failed to upload image to R2 server-side:", r2Err.message || r2Err);
       }
     }
 
-    // 3. FALLBACK TO FIREBASE STORAGE (if Supabase upload wasn't used or failed, and Firebase is available)
-    if ((!imageUrl || !imageUrl.startsWith("http")) && vendorId && bucket) {
+    // 3. SECONDARY: SUPABASE STORAGE UPLOAD (Fallback if R2 fails or is unconfigured)
+    if (!imageUrl || imageUrl.startsWith("/uploads/")) {
+      const supabaseClient = getServerSupabaseClient();
+      if (supabaseClient) {
+        try {
+          console.log("Attempting backend-side upload to Supabase Storage...");
+          
+          // Ensure 'products' bucket exists and is public (helps prevent 'bucket not found' or RLS policy initialization issues)
+          try {
+            const { error: createErr } = await supabaseClient.storage.createBucket("products", {
+              public: true
+            });
+            if (createErr) {
+              console.log("Bucket creation status/info (bucket 'products' probably already exists):", createErr.message);
+            } else {
+              console.log("Successfully verified or created the 'products' storage bucket");
+            }
+          } catch (bucketErr: any) {
+            console.warn("Soft warning: Bucket creation check skipped:", bucketErr.message || bucketErr);
+          }
+
+          // Dynamically route to correct folders to comply with Supabase RLS policies
+          const type = req.body.type || "";
+          let pathInBucket = "";
+          
+          const cleanVendorId = (vendorId && vendorId !== "undefined" && vendorId !== "null") ? vendorId : "global";
+
+          if (type === "logo" || type === "banner") {
+            pathInBucket = `stores/${cleanVendorId}/${type}_${Date.now()}.${extension}`;
+          } else if (!vendorId || vendorId === "undefined" || vendorId === "null") {
+            pathInBucket = `receipts/receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+          } else if (type === "enhancer") {
+            pathInBucket = `enhancer/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+          } else {
+            pathInBucket = `products/${cleanVendorId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+          }
+
+          // Clean up path from any accidental multiple slashes and leading/trailing slashes
+          pathInBucket = pathInBucket.replace(/\/+/g, "/");
+          if (pathInBucket.startsWith("/")) {
+            pathInBucket = pathInBucket.substring(1);
+          }
+          if (pathInBucket.endsWith("/")) {
+            pathInBucket = pathInBucket.slice(0, -1);
+          }
+
+          console.log(`Resolved backend upload bucket path: ${pathInBucket}`);
+
+          // Use Uint8Array to guarantee binary compatibility across JS runtimes
+          const { error } = await supabaseClient.storage
+            .from("products")
+            .upload(pathInBucket, new Uint8Array(buffer), {
+              contentType: imageType,
+              cacheControl: "3600",
+              upsert: true
+            });
+
+          if (error) {
+            throw error;
+          }
+
+          const { data: { publicUrl } } = supabaseClient.storage
+            .from("products")
+            .getPublicUrl(pathInBucket);
+
+          if (publicUrl) {
+            imageUrl = publicUrl;
+            console.log(`Uploaded image to Supabase Storage via backend: ${imageUrl}`);
+          }
+        } catch (supabaseErr: any) {
+          console.error("Failed to upload image to Supabase Storage server-side:", supabaseErr.message || supabaseErr);
+        }
+      }
+    }
+
+    // 4. FALLBACK TO FIREBASE STORAGE (if Supabase/R2 uploads weren't used or failed, and Firebase is available)
+    if ((!imageUrl || imageUrl.startsWith("/uploads/")) && vendorId && bucket) {
       try {
         console.log(`Attempting Firebase Storage fallback upload for vendor ${vendorId}...`);
         const file = bucket.file(`vendors/${vendorId}/${filename}`);

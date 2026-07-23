@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { User } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { getSupabaseClient } from '../lib/supabase';
+import { uploadToR2 } from '../lib/r2';
 import { Vendor, Product, Order, OrderStatus, ProductCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Package, Clock, CheckCircle2, MapPin, Globe, CreditCard, Bell, ChevronRight, Trash2, Car, Pencil, CupSoda, ShoppingBag, ShoppingCart, Instagram, Image as ImageIcon, Save, Phone, User as UserIcon, Printer, History, Zap, Crown, Store, Sparkles, Lock, Eye, EyeOff, Coins, X, Upload, Check } from 'lucide-react';
@@ -951,34 +951,31 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
     setIsUploadingReceipt(true);
     try {
       let receiptUrl = '';
-      const hasSupabaseKeys = 
-        Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
-        Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
-        
-      if (hasSupabaseKeys && receiptPreview) {
+      if (receiptFile) {
         try {
-          const supabase = getSupabaseClient();
-          const blob = dataURLtoBlob(receiptPreview);
-          const filename = `recharges/${vendor.id}/${Date.now()}_receipt.jpg`;
-          
-          const { error } = await supabase.storage
-            .from('products')
-            .upload(filename, blob, {
-              contentType: 'image/jpeg',
-              cacheControl: '3600',
-              upsert: true
+          receiptUrl = await uploadToR2(receiptFile, 'receipts');
+        } catch (r2Err) {
+          console.warn("R2 receipt upload error (client-side), falling back to server:", r2Err);
+          try {
+            const res = await fetch('/api/upload-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                image: receiptPreview, 
+                vendorId: vendor.id,
+                type: 'receipts'
+              })
             });
-            
-          if (error) throw error;
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('products')
-            .getPublicUrl(filename);
-            
-          receiptUrl = publicUrl;
-        } catch (supabaseErr) {
-          console.error("Supabase receipt upload error:", supabaseErr);
-          receiptUrl = receiptPreview;
+            if (res.ok) {
+              const data = await res.json();
+              receiptUrl = data.imageUrl;
+            } else {
+              receiptUrl = receiptPreview || '';
+            }
+          } catch (fallbackErr) {
+            console.error("Server fallback for receipt failed:", fallbackErr);
+            receiptUrl = receiptPreview || '';
+          }
         }
       } else {
         receiptUrl = receiptPreview || '';
@@ -1739,44 +1736,20 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     try {
       const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
-      const hasSupabaseKeys = 
-        Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
-        Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+      try {
+        console.log('Attempting product image upload to Cloudflare R2...');
+        // Convert base64 dataURL to Blob
+        const blob = dataURLtoBlob(base64Str);
+        const publicUrl = await uploadToR2(blob, 'stores');
 
-      if (hasSupabaseKeys) {
-        try {
-          console.log('Attempting client-side product image upload to Supabase...');
-          const supabase = getSupabaseClient();
-          
-          // Convert base64 dataURL to Blob
-          const blob = dataURLtoBlob(base64Str);
-          
-          const fileExt = file.name.split('.').pop() || 'jpg';
-          const filename = `products/${vendorId || 'global'}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-          
-          const { error: uploadErr } = await supabase.storage
-            .from('products')
-            .upload(filename, blob, {
-              contentType: file.type || 'image/jpeg',
-              cacheControl: '3600',
-              upsert: true
-            });
+        if (!publicUrl) throw new Error('No public URL returned.');
 
-          if (uploadErr) throw uploadErr;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('products')
-            .getPublicUrl(filename);
-
-          if (!publicUrl) throw new Error('No public URL returned.');
-
-          setNewData(prev => ({ ...prev, imageUrl: publicUrl }));
-          console.log('Product image uploaded successfully to Supabase:', publicUrl);
-          setIsUploadingImage(false);
-          return;
-        } catch (supabaseErr: any) {
-          console.warn('Supabase product upload failed, falling back to server...', supabaseErr);
-        }
+        setNewData(prev => ({ ...prev, imageUrl: publicUrl }));
+        console.log('Product image uploaded successfully to R2:', publicUrl);
+        setIsUploadingImage(false);
+        return;
+      } catch (r2Err: any) {
+        console.warn('R2 product upload failed, falling back to server...', r2Err);
       }
 
       const res = await fetch('/api/upload-image', {
@@ -2616,43 +2589,20 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
           // Compress to JPEG with 0.6 quality
           const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           try {
-            const hasSupabaseKeys = 
-              Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
-              Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+            try {
+              console.log('Attempting settings image upload to Cloudflare R2...');
+              // Convert base64 dataURL to Blob
+              const blob = dataURLtoBlob(dataUrl);
+              const publicUrl = await uploadToR2(blob, 'stores');
 
-            if (hasSupabaseKeys) {
-              try {
-                console.log('Attempting client-side settings image upload to Supabase...');
-                const supabase = getSupabaseClient();
-                
-                // Convert base64 dataURL to Blob
-                const blob = dataURLtoBlob(dataUrl);
-                
-                const filename = `stores/${vendor.id}/${type}_${Date.now()}.jpg`;
-                
-                const { error: uploadErr } = await supabase.storage
-                  .from('products')
-                  .upload(filename, blob, {
-                    contentType: 'image/jpeg',
-                    cacheControl: '3600',
-                    upsert: true
-                  });
+              if (!publicUrl) throw new Error('No public URL returned.');
 
-                if (uploadErr) throw uploadErr;
-
-                const { data: { publicUrl } } = supabase.storage
-                  .from('products')
-                  .getPublicUrl(filename);
-
-                if (!publicUrl) throw new Error('No public URL returned.');
-
-                if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: publicUrl }));
-                else setFormData(prev => ({ ...prev, bannerUrl: publicUrl }));
-                console.log(`Settings ${type} uploaded successfully to Supabase:`, publicUrl);
-                return;
-              } catch (supabaseErr: any) {
-                console.warn('Supabase settings image upload failed, falling back to server...', supabaseErr);
-              }
+              if (type === 'logo') setFormData(prev => ({ ...prev, logoUrl: publicUrl }));
+              else setFormData(prev => ({ ...prev, bannerUrl: publicUrl }));
+              console.log(`Settings ${type} uploaded successfully to R2:`, publicUrl);
+              return;
+            } catch (r2Err: any) {
+              console.warn('R2 settings image upload failed, falling back to server...', r2Err);
             }
 
             const res = await fetch('/api/upload-image', {

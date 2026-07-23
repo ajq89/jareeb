@@ -1,11 +1,11 @@
 import React, { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { Upload, Image as ImageIcon, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
-import { getSupabaseClient } from "../lib/supabase";
+import { uploadToR2 } from "../lib/r2";
 
 interface ImageUploaderProps {
   /** The ID of the store used for naming conflict prevention */
   storeId: string;
-  /** Callback fired when the image is successfully uploaded to Supabase */
+  /** Callback fired when the image is successfully uploaded */
   onUploadSuccess: (url: string) => void;
   /** Optional callback for capturing upload errors */
   onUploadError?: (error: string) => void;
@@ -32,10 +32,12 @@ export default function ImageUploader({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check if Supabase variables are set
-  const hasSupabaseKeys = 
-    Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
-    Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+  // Check if R2 variables are set
+  const hasR2Keys = 
+    Boolean((import.meta as any).env.VITE_R2_ENDPOINT) && 
+    Boolean((import.meta as any).env.VITE_R2_ACCESS_KEY_ID) &&
+    Boolean((import.meta as any).env.VITE_R2_SECRET_ACCESS_KEY) &&
+    Boolean((import.meta as any).env.VITE_R2_BUCKET_NAME);
 
   // Localization strings
   const dict = {
@@ -48,8 +50,8 @@ export default function ImageUploader({
       success: "تم رفع الصورة بنجاح!",
       errorInvalidType: "عذراً، الملف المحدد ليس صورة صالحة. يرجى اختيار صورة بصيغة (PNG, JPG, JPEG, WEBP).",
       errorTooLarge: "حجم الصورة كبير جداً. الحد الأقصى المسموح به هو 2 ميجابايت.",
-      errorMissingKeys: "مفتاح Supabase غير مهيأ. يرجى إضافة VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY إلى الإعدادات.",
-      errorUploadFailed: "فشل رفع الصورة إلى Supabase Storage. يرجى التحقق من إعدادات الـ Bucket وسياسات RLS.",
+      errorMissingKeys: "إعدادات R2 غير مكتملة. يرجى إضافة متغيرات VITE_R2_* إلى الإعدادات.",
+      errorUploadFailed: "فشل رفع الصورة إلى Cloudflare R2. يرجى التحقق من الإعدادات.",
       retry: "إعادة المحاولة",
     },
     en: {
@@ -61,19 +63,13 @@ export default function ImageUploader({
       success: "Image uploaded successfully!",
       errorInvalidType: "Invalid file type. Please select an image (PNG, JPG, JPEG, WEBP).",
       errorTooLarge: "File is too large. Maximum allowed size is 2MB.",
-      errorMissingKeys: "Supabase keys are missing. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
-      errorUploadFailed: "Upload to Supabase Storage failed. Please check your storage bucket setup and RLS rules.",
+      errorMissingKeys: "R2 keys are missing. Please configure VITE_R2_* variables.",
+      errorUploadFailed: "Upload to Cloudflare R2 failed. Please check your configuration.",
       retry: "Retry",
     }
   };
 
   const t = dict[language];
-
-  // Helper to sanitize file extension
-  const getCleanExtension = (filename: string): string => {
-    const ext = filename.split(".").pop()?.toLowerCase() || "png";
-    return ["png", "jpg", "jpeg", "webp"].includes(ext) ? ext : "png";
-  };
 
   // Main file processing & validation logic
   const processAndUploadFile = async (file: File) => {
@@ -98,8 +94,8 @@ export default function ImageUploader({
       return;
     }
 
-    // 3. Supabase Key Validation
-    if (!hasSupabaseKeys) {
+    // 3. R2 Key Validation
+    if (!hasR2Keys) {
       const err = t.errorMissingKeys;
       setErrorMessage(err);
       if (onUploadError) onUploadError(err);
@@ -113,62 +109,25 @@ export default function ImageUploader({
     setIsUploading(true);
 
     try {
-      // 4. Generate Unique File Name
-      const cleanExt = getCleanExtension(file.name);
-      const sanitizedStoreId = storeId.replace(/[^a-zA-Z0-9-_]/g, "") || "global";
-      let uniqueFilename = `${sanitizedStoreId}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${cleanExt}`;
-      
-      // Clean up path from any accidental multiple slashes and leading/trailing slashes
-      uniqueFilename = uniqueFilename.replace(/\/+/g, "/");
-      if (uniqueFilename.startsWith("/")) {
-        uniqueFilename = uniqueFilename.substring(1);
-      }
-      if (uniqueFilename.endsWith("/")) {
-        uniqueFilename = uniqueFilename.slice(0, -1);
-      }
-
-      const supabase = getSupabaseClient();
-
       // Track upload start simulated progress for better UX
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
-          if (prev >= 90) {
+          if (prev >= 95) {
             clearInterval(progressInterval);
-            return 90;
+            return 95;
           }
-          return prev + 10;
+          return prev + 5;
         });
-      }, 150);
+      }, 100);
 
-      // 5. Execute Supabase Storage Upload
+      // 4. Execute R2 Upload (Client-Side)
+      let publicUrl = "";
       try {
-        const { data, error } = await supabase.storage
-          .from("products")
-          .upload(uniqueFilename, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (error) {
-          throw error;
-        }
-
-        setUploadProgress(100);
-
-        // 6. Get Public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from("products")
-          .getPublicUrl(uniqueFilename);
-
-        if (!publicUrl) {
-          throw new Error("Unable to fetch public URL from Supabase storage bucket.");
-        }
-
-        // Fire success callback
-        onUploadSuccess(publicUrl);
-      } catch (directUploadError: any) {
-        console.warn("Direct client-side upload failed, attempting backend-side fallback upload...", directUploadError);
+        publicUrl = await uploadToR2(file, 'stores');
+      } catch (clientR2Error: any) {
+        console.warn("Client-side R2 upload failed (likely CORS), attempting server-side fallback...", clientR2Error);
         
+        // Convert to base64 for server-side upload
         const base64Str = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
@@ -182,7 +141,7 @@ export default function ImageUploader({
           body: JSON.stringify({
             image: base64Str,
             vendorId: storeId,
-            type: "product"
+            type: "stores"
           })
         });
 
@@ -193,17 +152,20 @@ export default function ImageUploader({
 
         const serverData = await res.json();
         if (serverData.imageUrl) {
-          setUploadProgress(100);
-          onUploadSuccess(serverData.imageUrl);
+          publicUrl = serverData.imageUrl;
         } else {
           throw new Error("Server response did not include a valid image URL.");
         }
       }
-
+      
       clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Fire success callback
+      onUploadSuccess(publicUrl);
 
     } catch (error: any) {
-      console.error("Supabase image upload failed:", error);
+      console.error("R2 image upload failed:", error);
       const err = `${t.errorUploadFailed} (${error.message || error})`;
       setErrorMessage(err);
       if (onUploadError) onUploadError(err);
@@ -265,12 +227,12 @@ export default function ImageUploader({
   return (
     <div className={`w-full ${className}`}>
       {/* Missing Keys Visual Banner Guard */}
-      {!hasSupabaseKeys && (
+      {!hasR2Keys && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-amber-800 text-xs sm:text-sm font-medium">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-bold">
-              {language === "ar" ? "إعداد Supabase مطلوب" : "Supabase Setup Required"}
+              {language === "ar" ? "إعداد R2 مطلوب" : "R2 Setup Required"}
             </p>
             <p className="text-amber-700 font-normal leading-relaxed">
               {t.errorMissingKeys}

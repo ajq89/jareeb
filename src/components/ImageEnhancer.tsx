@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../lib/i18n";
 import { doc, updateDoc } from "firebase/firestore";
-import { getSupabaseClient } from "../lib/supabase";
+import { uploadToR2 } from "../lib/r2";
 import { db } from "../lib/firebase";
 
 function dataURLtoBlob(dataurl: string): Blob {
@@ -212,53 +212,19 @@ export default function ImageEnhancer({
     try {
       const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
-      const hasSupabaseKeys = 
-        Boolean((import.meta as any).env.VITE_SUPABASE_URL) && 
-        Boolean((import.meta as any).env.VITE_SUPABASE_ANON_KEY);
+      try {
+        console.log('Attempting enhancer image upload to Cloudflare R2...');
+        const blob = dataURLtoBlob(base64Str);
+        const publicUrl = await uploadToR2(blob, 'stores');
 
-      if (hasSupabaseKeys) {
-        try {
-          console.log('Attempting client-side enhancer image upload to Supabase...');
-          const supabase = getSupabaseClient();
-          
-          // Convert base64 dataURL to Blob
-          const blob = dataURLtoBlob(base64Str);
-          
-          const fileExt = file.name.split('.').pop() || 'jpg';
-          let filename = `enhancer/${vendorId || 'global'}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-          
-          // Clean up path from any accidental multiple slashes and leading/trailing slashes
-          filename = filename.replace(/\/+/g, "/");
-          if (filename.startsWith("/")) {
-            filename = filename.substring(1);
-          }
-          if (filename.endsWith("/")) {
-            filename = filename.slice(0, -1);
-          }
-          
-          const { error: uploadErr } = await supabase.storage
-            .from('products')
-            .upload(filename, blob, {
-              contentType: file.type || 'image/jpeg',
-              cacheControl: '3600',
-              upsert: true
-            });
+        if (!publicUrl) throw new Error('No public URL returned.');
 
-          if (uploadErr) throw uploadErr;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('products')
-            .getPublicUrl(filename);
-
-          if (!publicUrl) throw new Error('No public URL returned.');
-
-          setRawImageUrl(publicUrl);
-          console.log('Enhancer image uploaded successfully to Supabase:', publicUrl);
-          setIsUploading(false);
-          return;
-        } catch (supabaseErr: any) {
-          console.warn('Supabase enhancer upload failed, falling back to server...', supabaseErr);
-        }
+        setRawImageUrl(publicUrl);
+        console.log('Enhancer image uploaded successfully to R2:', publicUrl);
+        setIsUploading(false);
+        return;
+      } catch (r2Err: any) {
+        console.warn('R2 enhancer upload failed, falling back to server...', r2Err);
       }
 
       const res = await fetch("/api/upload-image", {
