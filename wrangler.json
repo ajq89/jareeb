@@ -10,3 +10,22 @@
     "not_found_handling": "single-page-application"
   }
 }
+{
+  "name": "jareeb",
+  "main": "dist/server.cjs",
+  "assets": {
+    "directory": "./dist"
+  },
+  "routes": [
+    {
+      "pattern": "jareeb.app",
+      "custom_domain": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "jareeb-media",
+      "bucket_name": "jareeb-media"
+    }
+  ]
+}
