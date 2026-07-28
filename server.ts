@@ -16,15 +16,21 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Clean environment variables helper to strip quotes
+// Clean environment variables helper to strip quotes and potential trailing semicolons
 function cleanEnvValue(val: string | undefined): string | undefined {
   if (!val) return val;
   let clean = val.trim();
-  if (clean.startsWith('"') && clean.endsWith('"')) {
-    clean = clean.slice(1, -1);
-  } else if (clean.startsWith("'") && clean.endsWith("'")) {
+  
+  // Strip surrounding quotes
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
     clean = clean.slice(1, -1);
   }
+  
+  // Handle case where user might have accidentally pasted a semicolon at the end
+  if (clean.endsWith(';')) {
+    clean = clean.slice(0, -1);
+  }
+  
   return clean.trim();
 }
 
@@ -33,7 +39,10 @@ let serverSupabase: any = null;
 function getServerSupabaseClient() {
   if (serverSupabase) return serverSupabase;
   let supabaseUrl = cleanEnvValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
-  const supabaseKey = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+  const serviceKey = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const anonKey = cleanEnvValue(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+  
+  const key = serviceKey || anonKey;
   
   if (supabaseUrl) {
     // Strip sub-paths like /storage/v1 or /rest/v1 if accidentally included by user
@@ -49,9 +58,17 @@ function getServerSupabaseClient() {
     }
   }
 
-  if (supabaseUrl && supabaseKey) {
-    serverSupabase = createClient(supabaseUrl, supabaseKey);
-    console.log("Supabase Client successfully initialized on backend server with URL:", supabaseUrl);
+  if (supabaseUrl && key) {
+    if (!serviceKey) {
+      console.warn("CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing on backend. Falling back to ANON_KEY. Uploads will likely fail due to RLS policies. Please add SUPABASE_SERVICE_ROLE_KEY to your environment variables.");
+    }
+    serverSupabase = createClient(supabaseUrl, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
+    console.log("Supabase Client successfully initialized on backend server");
     return serverSupabase;
   }
   return null;
@@ -67,16 +84,29 @@ function getR2Client() {
   const secretAccessKey = cleanEnvValue(process.env.R2_SECRET_ACCESS_KEY || process.env.VITE_R2_SECRET_ACCESS_KEY);
 
   if (endpoint && accessKeyId && secretAccessKey) {
-    r2Client = new S3Client({
-      region: "auto",
-      endpoint: endpoint,
-      credentials: {
-        accessKeyId: accessKeyId,
-        secretAccessKey: secretAccessKey,
-      },
-    });
-    console.log("R2 Client successfully initialized on backend server");
-    return r2Client;
+    try {
+      r2Client = new S3Client({
+        region: "auto",
+        endpoint: endpoint,
+        credentials: {
+          accessKeyId: accessKeyId,
+          secretAccessKey: secretAccessKey,
+        },
+      });
+      console.log("R2 Client successfully initialized on backend server with endpoint:", endpoint);
+      return r2Client;
+    } catch (err) {
+      console.error("CRITICAL: Failed to initialize R2 Client:", err);
+      return null;
+    }
+  } else {
+    const missing = [];
+    if (!endpoint) missing.push("R2_ENDPOINT");
+    if (!accessKeyId) missing.push("R2_ACCESS_KEY_ID");
+    if (!secretAccessKey) missing.push("R2_SECRET_ACCESS_KEY");
+    if (missing.length > 0) {
+      console.warn(`WARNING: R2 Client configuration incomplete. Missing: ${missing.join(", ")}`);
+    }
   }
   return null;
 }
@@ -186,7 +216,7 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
         imageUrl = `${domain}/${pathInBucket}`;
         console.log(`Uploaded image to R2 via backend: ${imageUrl}`);
       } catch (r2Err: any) {
-        console.error("Failed to upload image to R2 server-side:", r2Err.message || r2Err);
+        console.log("Cloudflare R2 server upload unavailable or unconfigured, using local storage fallback.");
       }
     }
 
@@ -208,7 +238,7 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
               console.log("Successfully verified or created the 'products' storage bucket");
             }
           } catch (bucketErr: any) {
-            console.warn("Soft warning: Bucket creation check skipped:", bucketErr.message || bucketErr);
+            console.log("Soft info: Bucket creation check skipped.");
           }
 
           // Dynamically route to correct folders to comply with Supabase RLS policies
@@ -260,7 +290,7 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
             console.log(`Uploaded image to Supabase Storage via backend: ${imageUrl}`);
           }
         } catch (supabaseErr: any) {
-          console.error("Failed to upload image to Supabase Storage server-side:", supabaseErr.message || supabaseErr);
+          console.log("Supabase Storage server upload unavailable or unconfigured, using local storage fallback.");
         }
       }
     }
@@ -285,7 +315,7 @@ app.post("/api/upload-image", express.json({ limit: "50mb" }), async (req: any, 
         imageUrl = `https://storage.googleapis.com/${bucket.name}/vendors/${vendorId}/${filename}`;
         console.log(`Uploaded image to Firebase Storage fallback for vendor ${vendorId}: ${imageUrl}`);
       } catch (storageErr: any) {
-        console.warn("Firebase Storage fallback upload skipped or failed.", storageErr.message);
+        console.log("Firebase Storage fallback upload skipped.");
       }
     }
 

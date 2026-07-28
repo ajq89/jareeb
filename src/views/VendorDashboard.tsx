@@ -1442,6 +1442,8 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
 
 function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Vendor, isHistory?: boolean }) {
   const { t, language, isRTL } = useLanguage();
+  const [selectedReceipt, setSelectedReceipt] = useState<{ url: string; orderId: string; customerName: string; total: number } | null>(null);
+
   const updateStatus = async (id: string, status: OrderStatus) => {
     await updateDoc(doc(db, 'orders', id), { status });
   };
@@ -1631,6 +1633,28 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
                   </span>
                 </div>
               )}
+
+              {/* Receipt Attachment Indicator / Button */}
+              {order.receiptUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedReceipt({
+                    url: order.receiptUrl!,
+                    orderId: order.id,
+                    customerName: order.customerName,
+                    total: order.total
+                  })}
+                  className="mt-2.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black transition-all active:scale-95 shadow-sm rtl:flex-row-reverse"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{language === 'ar' ? 'عرض إيصال التحويل 📄' : 'View Transfer Receipt 📄'}</span>
+                </button>
+              ) : (
+                <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold rtl:flex-row-reverse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>{language === 'ar' ? 'لم يتم إرفاق إيصال' : 'No Receipt Attached'}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1653,9 +1677,24 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
           </div>
 
           <div className="flex items-center justify-end gap-3 w-full sm:w-auto rtl:flex-row-reverse">
+            {order.receiptUrl && (
+              <button 
+                onClick={() => setSelectedReceipt({
+                  url: order.receiptUrl!,
+                  orderId: order.id,
+                  customerName: order.customerName,
+                  total: order.total
+                })}
+                className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all active:scale-90"
+                title={language === 'ar' ? 'معاينة الإيصال' : 'View Receipt'}
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+            )}
             <button 
               onClick={() => printReceipt(order)}
               className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all active:scale-90"
+              title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Receipt'}
             >
               <Printer className="w-5 h-5" />
             </button>
@@ -1674,6 +1713,63 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
           </div>
         </motion.div>
       ))}
+
+      {/* Receipt Viewing Modal */}
+      <AnimatePresence>
+        {selectedReceipt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]"
+            >
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rtl:flex-row-reverse">
+                <div className="rtl:text-right">
+                  <h3 className="font-black text-slate-800 text-base">
+                    {language === 'ar' ? 'إيصال تحويل البنفت بي / البنك' : 'Transfer Receipt'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold mt-0.5">
+                    {language === 'ar' ? `العميل: ${selectedReceipt.customerName} • ${selectedReceipt.total.toFixed(2)} BHD` : `Customer: ${selectedReceipt.customerName} • ${selectedReceipt.total.toFixed(2)} BHD`}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedReceipt(null)}
+                  className="p-2 hover:bg-slate-200 text-slate-500 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 flex-1 overflow-y-auto flex flex-col items-center justify-center bg-slate-900/5 min-h-[300px]">
+                <img 
+                  src={selectedReceipt.url} 
+                  alt="Payment Receipt" 
+                  className="max-w-full max-h-[60vh] object-contain rounded-2xl shadow-lg border border-slate-200"
+                />
+              </div>
+
+              <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3 rtl:flex-row-reverse">
+                <a
+                  href={selectedReceipt.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4 text-slate-500" />
+                  <span>{language === 'ar' ? 'فتح الصورة بالحجم الكامل' : 'Open Full Image'}</span>
+                </a>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all active:scale-95 shadow-md"
+                >
+                  {language === 'ar' ? 'تم التحقق والقبول' : 'Verified & Close'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

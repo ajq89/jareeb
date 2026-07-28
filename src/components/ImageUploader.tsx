@@ -94,14 +94,6 @@ export default function ImageUploader({
       return;
     }
 
-    // 3. R2 Key Validation
-    if (!hasR2Keys) {
-      const err = t.errorMissingKeys;
-      setErrorMessage(err);
-      if (onUploadError) onUploadError(err);
-      return;
-    }
-
     // Generate local preview URL
     const localUrl = URL.createObjectURL(file);
     setPreviewUrl(localUrl);
@@ -120,43 +112,8 @@ export default function ImageUploader({
         });
       }, 100);
 
-      // 4. Execute R2 Upload (Client-Side)
-      let publicUrl = "";
-      try {
-        publicUrl = await uploadToR2(file, 'stores');
-      } catch (clientR2Error: any) {
-        console.warn("Client-side R2 upload failed (likely CORS), attempting server-side fallback...", clientR2Error);
-        
-        // Convert to base64 for server-side upload
-        const base64Str = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (err) => reject(err);
-        });
-
-        const res = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image: base64Str,
-            vendorId: storeId,
-            type: "stores"
-          })
-        });
-
-        if (!res.ok) {
-          const responseText = await res.text();
-          throw new Error(`Server fallback failed: ${responseText}`);
-        }
-
-        const serverData = await res.json();
-        if (serverData.imageUrl) {
-          publicUrl = serverData.imageUrl;
-        } else {
-          throw new Error("Server response did not include a valid image URL.");
-        }
-      }
+      // Execute R2 Upload (with server fallback)
+      const publicUrl = await uploadToR2(file, 'stores');
       
       clearInterval(progressInterval);
       setUploadProgress(100);
