@@ -113,21 +113,28 @@ export default function ImageUploader({
       }, 100);
 
       // Execute R2 Upload (with server fallback)
-      const publicUrl = await uploadToR2(file, 'stores');
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      try {
+        const publicUrl = await uploadToR2(file, 'stores');
+        
+        clearInterval(progressInterval);
+        setUploadProgress(100);
 
-      // Fire success callback
-      onUploadSuccess(publicUrl);
-
-    } catch (error: any) {
-      console.error("R2 image upload failed:", error);
-      const err = `${t.errorUploadFailed} (${error.message || error})`;
-      setErrorMessage(err);
-      if (onUploadError) onUploadError(err);
-      // Clear preview if upload failed
-      setPreviewUrl(null);
+        // Fire success callback
+        onUploadSuccess(publicUrl);
+      } catch (uploadErr) {
+        console.warn("R2/Server image upload failed, falling back to local file dataUrl:", uploadErr);
+        
+        // Convert file to dataURL as ultimate guaranteed fallback
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const dataUrl = evt.target?.result as string;
+          clearInterval(progressInterval);
+          setUploadProgress(100);
+          setPreviewUrl(dataUrl);
+          onUploadSuccess(dataUrl);
+        };
+        reader.readAsDataURL(file);
+      }
     } finally {
       setIsUploading(false);
     }

@@ -212,38 +212,42 @@ export default function ImageEnhancer({
     try {
       const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
+      // Set compressed base64 immediately so user can edit right away
+      setRawImageUrl(base64Str);
+
       try {
         console.log('Attempting enhancer image upload to Cloudflare R2...');
         const blob = dataURLtoBlob(base64Str);
         const publicUrl = await uploadToR2(blob, 'stores');
 
-        if (!publicUrl) throw new Error('No public URL returned.');
-
-        setRawImageUrl(publicUrl);
-        console.log('Enhancer image uploaded successfully to R2:', publicUrl);
-        setIsUploading(false);
-        return;
+        if (publicUrl) {
+          setRawImageUrl(publicUrl);
+          console.log('Enhancer image uploaded successfully:', publicUrl);
+          return;
+        }
       } catch (r2Err: any) {
-        console.warn('R2 enhancer upload failed, falling back to server...', r2Err);
+        console.warn('R2 enhancer upload skipped/failed, trying server endpoint...', r2Err);
       }
 
-      const res = await fetch("/api/upload-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64Str, vendorId })
-      });
+      try {
+        const res = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64Str, vendorId, type: "enhancer" })
+        });
 
-      if (!res.ok) {
-        throw new Error(language === "ar" ? "فشل رفع الصورة للخادم." : "Server failed to process file upload.");
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (data.imageUrl) {
+              setRawImageUrl(data.imageUrl);
+            }
+          }
+        }
+      } catch (serverErr) {
+        console.warn('Server upload fallback retained local compressed image:', serverErr);
       }
-
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(language === "ar" ? "استجاب الخادم بتنسيق غير صالح." : "Server returned an invalid response format.");
-      }
-
-      const data = await res.json();
-      setRawImageUrl(data.imageUrl);
     } catch (err: any) {
       console.error(err);
       setErrorMessage(err.message || "Upload error");

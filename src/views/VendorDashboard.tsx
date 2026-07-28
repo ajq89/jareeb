@@ -1832,36 +1832,41 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
     try {
       const base64Str = await compressAndResizeImage(file, 1000, 0.7);
       
+      // Set compressed base64 immediately as working fallback so upload never blocks product creation
+      setNewData(prev => ({ ...prev, imageUrl: base64Str }));
+
       try {
-        console.log('Attempting product image upload to Cloudflare R2...');
-        // Convert base64 dataURL to Blob
+        console.log('Attempting product image upload to Cloudflare R2 / Server...');
         const blob = dataURLtoBlob(base64Str);
         const publicUrl = await uploadToR2(blob, 'stores');
 
-        if (!publicUrl) throw new Error('No public URL returned.');
-
-        setNewData(prev => ({ ...prev, imageUrl: publicUrl }));
-        console.log('Product image uploaded successfully to R2:', publicUrl);
-        setIsUploadingImage(false);
-        return;
+        if (publicUrl) {
+          setNewData(prev => ({ ...prev, imageUrl: publicUrl }));
+          console.log('Product image uploaded successfully:', publicUrl);
+          return;
+        }
       } catch (r2Err: any) {
-        console.warn('R2 product upload failed, falling back to server...', r2Err);
+        console.warn('R2 upload skipped/failed, trying server endpoint...', r2Err);
       }
 
-      const res = await fetch('/api/upload-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Str, vendorId })
-      });
-      if (!res.ok) {
-        throw new Error(language === 'ar' ? 'فشل رفع الصورة للخادم.' : 'Server failed to process file upload.');
+      try {
+        const res = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Str, vendorId, type: 'products' })
+        });
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (data.imageUrl) {
+              setNewData(prev => ({ ...prev, imageUrl: data.imageUrl }));
+            }
+          }
+        }
+      } catch (serverErr) {
+        console.warn('Server upload fallback retained local compressed image:', serverErr);
       }
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(language === 'ar' ? 'استجاب الخادم بتنسيق غير صالح.' : 'Server returned an invalid response format.');
-      }
-      const data = await res.json();
-      setNewData(prev => ({ ...prev, imageUrl: data.imageUrl }));
     } catch (err: any) {
       console.error(err);
       setUploadError(err.message || 'Upload failed');

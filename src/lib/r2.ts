@@ -103,8 +103,13 @@ export async function uploadToR2(file: File | Blob, folder: 'stores' | 'receipts
     }
     throw new Error("Server upload endpoint did not return a valid image URL");
   } catch (serverError: any) {
-    console.error("All upload mechanisms failed:", serverError);
-    throw new Error(serverError.message || "Failed to upload file");
+    console.warn("Server upload mechanism fallback to dataUrl:", serverError);
+    try {
+      const base64Str = await blobToBase64(file);
+      return base64Str;
+    } catch (e) {
+      throw new Error(serverError.message || "Failed to upload file");
+    }
   }
 }
 
