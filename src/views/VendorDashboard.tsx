@@ -1523,16 +1523,20 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
 
           <div class="section">
             <span class="section-title">المنتجات</span>
-            ${order.items.map(item => `
+            ${order.items.map(item => {
+              const itemAddonsTotal = item.selectedAddons?.reduce((s, a) => s + (a.price || 0), 0) || 0;
+              const lineTotal = (item.price + itemAddonsTotal) * item.quantity;
+              return `
               <div class="item">
                 <div class="item-details">
                   <div class="item-name">${item.quantity}x ${item.name}</div>
                   ${item.selectedSize ? `<span class="addon">الحجم: ${item.selectedSize.label}</span>` : ''}
-                  ${item.selectedAddons?.map(addon => `<span class="addon">+ ${addon.name}</span>`).join('') || ''}
+                  ${item.selectedAddons?.map(addon => `<span class="addon">+ ${addon.name} ${addon.price ? `(${addon.price.toFixed(2)} BHD)` : ''}</span>`).join('') || ''}
+                  ${item.cakeSpecs ? `<span class="addon">كعكة: ${item.cakeSpecs.weightKg}كجم - ${item.cakeSpecs.flavor} ${item.cakeSpecs.writing ? `("${item.cakeSpecs.writing}")` : ''}</span>` : ''}
                 </div>
-                <div class="item-price">${(item.price * item.quantity).toFixed(2)}</div>
+                <div class="item-price">${lineTotal.toFixed(2)} BHD</div>
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
 
           <div class="total">
@@ -1658,20 +1662,61 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
             </div>
           </div>
 
-          <div className="w-full sm:flex-1 bg-slate-50 p-3 rounded-2xl border border-slate-100/50 rtl:text-right">
-            <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">{language === 'ar' ? 'تفاصيل الطلب' : 'Order Details'}</p>
-            <div className="space-y-1">
-              {order.items?.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center text-xs rtl:flex-row-reverse">
-                  <span className="font-bold text-slate-700">
-                    {item.quantity}x {item.name} 
-                  </span>
-                  <span className="font-bold text-slate-500">{item.price * item.quantity} BHD</span>
-                </div>
-              ))}
-              <div className="pt-2 mt-1 border-t border-slate-200 flex justify-between items-center text-sm rtl:flex-row-reverse">
-                <span className="font-black text-slate-400 uppercase text-[10px]">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
-                <span className="font-black text-indigo-600">{order.total} BHD</span>
+          <div className="w-full sm:flex-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/80 rtl:text-right">
+            <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">{language === 'ar' ? 'تفاصيل الطلب والإضافات' : 'Order Details & Addons'}</p>
+            <div className="space-y-2.5">
+              {order.items?.map((item, idx) => {
+                const addonsCost = item.selectedAddons?.reduce((s, a) => s + (a.price || 0), 0) || 0;
+                const lineTotal = (item.price + addonsCost) * item.quantity;
+                return (
+                  <div key={idx} className="pb-2 border-b border-slate-200/60 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-start text-xs rtl:flex-row-reverse">
+                      <div className="flex-1 rtl:text-right">
+                        <span className="font-bold text-slate-800">
+                          {item.quantity}x {item.name} 
+                        </span>
+                        {item.selectedSize && (
+                          <span className="mx-1.5 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-md inline-block">
+                            {item.selectedSize.label}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-slate-600 shrink-0">{lineTotal.toFixed(2)} BHD</span>
+                    </div>
+
+                    {/* Addons display */}
+                    {item.selectedAddons && item.selectedAddons.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1 rtl:flex-row-reverse">
+                        {item.selectedAddons.map((addon, aIdx) => (
+                          <span key={aIdx} className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <span>+ {addon.name}</span>
+                            {addon.price > 0 && (
+                              <span className="text-[10px] text-emerald-600 font-extrabold">({addon.price.toFixed(2)} BHD)</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Cake specs display if applicable */}
+                    {item.cakeSpecs && (
+                      <div className="mt-1.5 p-2 bg-amber-50/90 rounded-xl border border-amber-200/60 text-[11px] text-amber-900 font-medium space-y-0.5">
+                        <p className="font-black text-amber-950 flex items-center gap-1 rtl:flex-row-reverse">
+                          <span>🎂 {language === 'ar' ? 'مواصفات الكعكة:' : 'Custom Cake Specs:'}</span>
+                        </p>
+                        <p>• {language === 'ar' ? 'الوزن:' : 'Weight:'} <strong>{item.cakeSpecs.weightKg} {language === 'ar' ? 'كجم' : 'kg'}</strong></p>
+                        <p>• {language === 'ar' ? 'النكهة:' : 'Flavor:'} <strong>{item.cakeSpecs.flavor}</strong></p>
+                        {item.cakeSpecs.writing && (
+                          <p className="italic">• {language === 'ar' ? 'الكتابة:' : 'Text:'} "<strong>{item.cakeSpecs.writing}</strong>"</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="pt-2 border-t border-slate-300 flex justify-between items-center text-sm rtl:flex-row-reverse">
+                <span className="font-black text-slate-400 uppercase text-[10px]">{language === 'ar' ? 'الإجمالي الكلي' : 'Total'}</span>
+                <span className="font-black text-indigo-600">{typeof order.total === 'number' ? order.total.toFixed(2) : order.total} BHD</span>
               </div>
             </div>
           </div>

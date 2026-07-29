@@ -8,6 +8,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { auth, signInWithGoogle } from '../lib/firebase';
 import { Store, LogOut, LayoutDashboard, User as UserIcon, Languages, Shield } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import Logo from './Logo';
 
 interface NavbarProps {
   user: User | null;
@@ -36,13 +37,7 @@ export default function Navbar({ user }: NavbarProps) {
         <div className="flex justify-between h-16">
           <div className="flex items-center min-w-0">
             <Link to="/" className="flex flex-col items-center sm:items-start group transition-all hover:scale-105 active:scale-95">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter uppercase">Jareeb</span>
-                <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse mt-2" />
-              </div>
-              <span className="text-[8px] sm:text-[10px] font-black text-slate-400 -mt-1 tracking-wider uppercase">
-                من بيتهم ... الى سيارتك
-              </span>
+              <Logo size="md" />
             </Link>
           </div>
 

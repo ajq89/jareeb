@@ -73,13 +73,11 @@ export default function Storefront() {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
-  const [receiptUploadError, setReceiptUploadError] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setIsUploadingReceipt(true);
-      setReceiptUploadError('');
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
@@ -163,7 +161,6 @@ export default function Storefront() {
             console.error('Failed to upload receipt image:', err);
             // Fallback to local base64 if upload fails completely
             setReceiptImage(dataUrl);
-            setReceiptUploadError(language === 'ar' ? 'فشل الرفع للمخدم، تم استخدام الصورة محلياً.' : 'Upload failed, image stored locally.');
           } finally {
             setIsUploadingReceipt(false);
           }
@@ -1201,9 +1198,6 @@ export default function Storefront() {
                           )}
                         </div>
                       </div>
-                      {receiptUploadError && (
-                        <p className="text-xs font-bold text-rose-500 mt-2 text-center">{receiptUploadError}</p>
-                      )}
                     </div>
                   </div>
 

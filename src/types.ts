@@ -92,6 +92,7 @@ export interface OrderItem {
   quantity: number;
   selectedAddons?: Addon[];
   selectedSize?: Size;
+  cakeSpecs?: any;
 }
 
 export interface CarDetails {

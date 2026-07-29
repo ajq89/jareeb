@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, signInWithGoogle } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
+import Logo from '../components/Logo';
 import { 
   Store as StoreIcon, 
   Eye, 
@@ -54,11 +55,11 @@ export default function LoginPage() {
       <div className="max-w-md w-full relative z-10">
         
         {/* Brand Header */}
-        <div className="text-center mb-10">
-          <Link to="/" className="inline-flex items-center mb-4 group">
-            <img src="/logo-text.png" alt="Jareeb" className="h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center mb-3 group">
+            <Logo size="lg" showSubtext={true} />
           </Link>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">
             {language === 'ar' ? 'بوابة التجار المبدعين' : 'Creative Vendor Portal'}
           </p>
         </div>

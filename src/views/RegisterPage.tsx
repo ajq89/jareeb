@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firesto
 import { auth, db, signInWithGoogle } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
+import Logo from '../components/Logo';
 import { 
   User as UserIcon, 
   Store as StoreIcon, 
@@ -314,11 +315,11 @@ export default function RegisterPage() {
       <div className="max-w-xl w-full relative z-10">
         
         {/* Brand Header */}
-        <div className="text-center mb-10">
-          <Link to="/" className="inline-flex items-center mb-4 group">
-            <img src="/logo-text.png" alt="Jareeb" className="h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center mb-3 group">
+            <Logo size="lg" showSubtext={true} />
           </Link>
-          <p className="text-slate-400 font-bold text-sm tracking-widest uppercase">
+          <p className="text-slate-400 font-bold text-xs tracking-widest uppercase mt-1">
             {language === 'ar' ? 'بوابة التجار المبدعين' : 'Creative Vendor Portal'}
           </p>
         </div>

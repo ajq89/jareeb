@@ -31,6 +31,7 @@ import { Vendor } from '../types';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../lib/i18n';
+import Logo from '../components/Logo';
 
 export default function LandingPage() {
   const { t, language, isRTL } = useLanguage();
@@ -857,15 +858,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-indigo-950/40">
             {/* Branding Column */}
             <div className="md:col-span-5 space-y-4 text-center md:text-left rtl:md:text-right">
-              <div className="flex flex-col items-center md:items-start group">
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-black text-white tracking-tighter uppercase">Jareeb</span>
-                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse mt-2" />
-                </div>
-                <span className="text-[10px] font-black text-indigo-400 -mt-1 tracking-wider uppercase">
-                  من بيتهم ... الى سيارتك
-                </span>
-              </div>
+              <Logo variant="light" size="lg" />
               <p className="text-slate-400 font-medium text-xs sm:text-sm leading-relaxed max-w-sm">
                 {language === 'ar' 
                   ? 'منصة ذكية تمكّن أصحاب المشاريع المنزلية من إنشاء متجر إلكتروني احترافي، إدارة الطلبات، واستقبال المدفوعات بكل سهولة.' 
