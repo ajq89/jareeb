@@ -170,24 +170,35 @@ export default function TrackingPage() {
                       {/* Standard Bahrain Address Display */}
                       <p className="text-sm sm:text-xs text-slate-600 font-bold mt-1.5 flex flex-wrap gap-1.5 rtl:flex-row-reverse">
                         {vendor?.location && <span>{vendor.location}</span>}
-                        {vendor?.buildingNo && <span>• {language === 'ar' ? `مبنى ${vendor.buildingNo}` : `Bldg ${vendor.buildingNo}`}</span>}
-                        {vendor?.roadNo && <span>• {language === 'ar' ? `طريق ${vendor.roadNo}` : `Road ${vendor.roadNo}`}</span>}
-                        {vendor?.blockNo && <span>• {language === 'ar' ? `مجمع ${vendor.blockNo}` : `Block ${vendor.blockNo}`}</span>}
+                        {order.status !== 'pending' && vendor?.buildingNo && <span>• {language === 'ar' ? `مبنى ${vendor.buildingNo}` : `Bldg ${vendor.buildingNo}`}</span>}
+                        {order.status !== 'pending' && vendor?.roadNo && <span>• {language === 'ar' ? `طريق ${vendor.roadNo}` : `Road ${vendor.roadNo}`}</span>}
+                        {order.status !== 'pending' && vendor?.blockNo && <span>• {language === 'ar' ? `مجمع ${vendor.blockNo}` : `Block ${vendor.blockNo}`}</span>}
                         {vendor?.city && <span>• {vendor.city}</span>}
                       </p>
                     </div>
                   </div>
 
-                  {vendor?.mapUrl && (
-                    <a 
-                      href={vendor.mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-emerald-100/50"
-                    >
-                      <MapPin className="w-4 h-4 text-white" />
-                      {language === 'ar' ? 'فتح الموقع في قوقل ماب' : 'Open in Google Maps'}
-                    </a>
+                  {order.status === 'pending' ? (
+                    <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl text-center text-amber-800 font-bold text-xs flex items-center justify-center gap-2 rtl:flex-row-reverse">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        {language === 'ar' 
+                          ? 'سيتم إظهار رابط موقع المتجر فور قبول الطلب من قبل المتجر' 
+                          : 'Store location link will be displayed once the order is accepted by the store'}
+                      </span>
+                    </div>
+                  ) : (
+                    vendor?.mapUrl && (
+                      <a 
+                        href={vendor.mapUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-emerald-100/50"
+                      >
+                        <MapPin className="w-4 h-4 text-white" />
+                        {language === 'ar' ? 'فتح الموقع في قوقل ماب' : 'Open in Google Maps'}
+                      </a>
+                    )
                   )}
                 </div>
 

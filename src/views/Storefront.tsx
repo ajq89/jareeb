@@ -501,23 +501,8 @@ export default function Storefront() {
                     <span>@{vendor.instagram}</span>
                   </a>
                 )}
-                {vendor.mapUrl ? (
-                  <a 
-                    href={vendor.mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 backdrop-blur-md border border-indigo-500/20 px-3 py-1.5 rounded-full transition-all duration-200 shadow-sm"
-                  >
-                    <MapPin className="w-3 h-3 text-emerald-300 shrink-0" />
-                    <span>{vendor.location || (language === 'ar' ? 'موقعنا على الخارطة' : 'Our Location')}</span>
-                    {vendor.buildingNo && (
-                      <span className="text-[9px] bg-white/20 px-1 py-0.5 rounded text-white font-black ml-1">
-                        {language === 'ar' ? `مبنى ${vendor.buildingNo}` : `Bldg ${vendor.buildingNo}`}
-                      </span>
-                    )}
-                  </a>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/90 bg-slate-900/45 hover:bg-slate-900/60 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-full transition-all duration-200">
+                {vendor.location && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/90 bg-slate-900/45 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-full transition-all duration-200 shadow-sm">
                     <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
                     <span>{vendor.location}</span>
                   </div>
