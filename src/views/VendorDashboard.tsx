@@ -480,19 +480,34 @@ export default function VendorDashboard({ user }: DashboardProps) {
                   ))}
                 </ul>
 
-                <button 
-                  onClick={() => handleExpiredUpgrade(plan.id)}
-                  disabled={expiredUpgradingPlanId !== null}
-                  className={`w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50 ${
-                    plan.popular
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
-                    : 'bg-slate-900 hover:bg-slate-800 text-white'
-                  }`}
-                >
-                  {isUpgradingThis 
-                    ? (language === 'ar' ? 'جاري التنشيط...' : 'Activating...') 
-                    : (language === 'ar' ? 'تفعيل الحساب الآن' : 'Activate Account Now')}
-                </button>
+                {plan.id === 'enterprise' ? (
+                  <a 
+                    href={`https://wa.me/97336368522?text=${encodeURIComponent(
+                      language === 'ar' 
+                        ? `مرحباً، أرغب في الاستفسار والاشتراك في باقة الشركات لمتجري: ${resolvedVendor.name}` 
+                        : `Hello, I would like to inquire about the Enterprise plan for my store: ${resolvedVendor.name}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full block text-center py-3.5 rounded-xl text-xs font-black uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all active:scale-95"
+                  >
+                    {language === 'ar' ? 'تواصل عبر الواتساب 💬' : 'Contact via WhatsApp 💬'}
+                  </a>
+                ) : (
+                  <button 
+                    onClick={() => handleExpiredUpgrade(plan.id)}
+                    disabled={expiredUpgradingPlanId !== null}
+                    className={`w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95 disabled:opacity-50 ${
+                      plan.popular
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                    }`}
+                  >
+                    {isUpgradingThis 
+                      ? (language === 'ar' ? 'جاري التنشيط...' : 'Activating...') 
+                      : (language === 'ar' ? 'تفعيل الحساب الآن' : 'Activate Account Now')}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -555,26 +570,26 @@ export default function VendorDashboard({ user }: DashboardProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-4 py-4 sm:py-8">
       {/* Sleek Header & Audio Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 rtl:flex-row-reverse text-right rtl:text-right border-b border-slate-100 pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8 rtl:flex-row-reverse text-right rtl:text-right border-b border-slate-100 pb-5 sm:pb-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 rtl:flex-row-reverse">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2 rtl:flex-row-reverse">
             {language === 'ar' ? `أهلاً بك، ${resolvedVendor.name} 👋` : `Welcome back, ${resolvedVendor.name} 👋`}
           </h1>
-          <p className="text-slate-400 font-medium text-sm mt-1">
+          <p className="text-slate-400 font-medium text-xs sm:text-sm mt-1">
             {language === 'ar' ? 'لوحة تحكم جريب لإدارة الطلبات المباشرة والاستلام بسلاسة.' : 'Jareeb dashboard for managing direct incoming orders and real-time handoffs.'}
           </p>
         </div>
         
         {/* Real-time Controls Header (Sound Alerts & Store Status) */}
-        <div className="flex flex-wrap items-center gap-3 justify-end sm:justify-start rtl:justify-end">
+        <div className="w-full sm:w-auto grid grid-cols-1 sm:flex items-center gap-2 sm:gap-3">
           {/* Real-time Sound Alerts Toggle Control */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={toggleSound}
-            className={`flex items-center gap-3 px-5 py-3 rounded-2xl border transition-all font-black text-xs uppercase tracking-wider ${
+            className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-4 py-2.5 sm:py-3 rounded-2xl border transition-all font-black text-xs uppercase tracking-wider ${
               soundEnabled 
                 ? 'bg-indigo-50 border-indigo-100 text-indigo-700 shadow-sm' 
                 : 'bg-rose-50 border-rose-100 text-rose-600'
@@ -586,12 +601,12 @@ export default function VendorDashboard({ user }: DashboardProps) {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                 </div>
-                <span>{language === 'ar' ? 'تنبيهات رنين الطلبات: نشطة 🔔' : 'Sound Alerts: Active 🔔'}</span>
+                <span>{language === 'ar' ? 'تنبيهات الصوت: نشطة 🔔' : 'Sound Alerts: Active 🔔'}</span>
               </>
             ) : (
               <>
                 <span className="w-2 h-2 rounded-full bg-rose-400" />
-                <span>{language === 'ar' ? 'تنبيهات رنين الطلبات: معطلة 🔇' : 'Sound Alerts: Disabled 🔇'}</span>
+                <span>{language === 'ar' ? 'تنبيهات الصوت: معطلة 🔇' : 'Sound Alerts: Disabled 🔇'}</span>
               </>
             )}
           </motion.button>
@@ -613,11 +628,11 @@ export default function VendorDashboard({ user }: DashboardProps) {
                     );
                     setActiveTab('membership');
                   }}
-                  className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-slate-400 font-black text-xs uppercase tracking-wider cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-slate-400 font-black text-xs uppercase tracking-wider cursor-pointer"
                 >
                   <Lock className="w-3.5 h-3.5 text-slate-400" />
                   <span>
-                    {language === 'ar' ? 'إغلاق المتجر مؤقتاً (باقة برو) 🔒' : 'Temporary Closure (Pro Plan) 🔒'}
+                    {language === 'ar' ? 'إغلاق المتجر (برو) 🔒' : 'Store Closure (Pro) 🔒'}
                   </span>
                 </motion.button>
               );
@@ -636,7 +651,7 @@ export default function VendorDashboard({ user }: DashboardProps) {
                     console.error("Error toggling store status:", err);
                   }
                 }}
-                className={`flex items-center gap-3 px-5 py-3 rounded-2xl border transition-all font-black text-xs uppercase tracking-wider ${
+                className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-4 py-2.5 sm:py-3 rounded-2xl border transition-all font-black text-xs uppercase tracking-wider ${
                   isClosed 
                     ? 'bg-rose-50 border-rose-100 text-rose-700 shadow-sm shadow-rose-100' 
                     : 'bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm shadow-emerald-100'
@@ -653,7 +668,7 @@ export default function VendorDashboard({ user }: DashboardProps) {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </div>
-                    <span>{language === 'ar' ? 'المحل: مفتوح ومتاح للطلب 🟢' : 'Store: Open for Orders 🟢'}</span>
+                    <span>{language === 'ar' ? 'المحل: مفتوح للطلب 🟢' : 'Store: Open for Orders 🟢'}</span>
                   </>
                 )}
               </motion.button>
@@ -662,38 +677,40 @@ export default function VendorDashboard({ user }: DashboardProps) {
         </div>
       </div>
 
-      {/* Header Stat Cards (Bento) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 rtl:flex-row-reverse">
-        <div className="sleek-card p-6 rtl:text-right">
+      {/* Header Stat Cards (Bento) - Optimized Mobile Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-10 rtl:flex-row-reverse">
+        <div className="sleek-card p-4 sm:p-6 rtl:text-right flex flex-col justify-between">
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'إيرادات اليوم' : "Today's Revenue"}</p>
-          <div className="flex items-end gap-2 rtl:flex-row-reverse">
-            <p className="text-3xl font-black text-slate-800 tracking-tighter">BHD {todayRevenue.toFixed(2)}</p>
+          <div className="flex items-end gap-1.5 rtl:flex-row-reverse">
+            <p className="text-xl sm:text-3xl font-black text-slate-800 tracking-tighter truncate">BHD {todayRevenue.toFixed(2)}</p>
           </div>
         </div>
-        <div className="sleek-card p-6 border-l-4 border-l-indigo-600 rtl:border-l-0 rtl:border-r-4 rtl:border-r-indigo-600 rtl:text-right">
+        <div className="sleek-card p-4 sm:p-6 border-l-4 border-l-indigo-600 rtl:border-l-0 rtl:border-r-4 rtl:border-r-indigo-600 rtl:text-right flex flex-col justify-between">
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'الطلبات المعلقة' : 'Pending Orders'}</p>
-          <p className="text-3xl font-black text-slate-800 tracking-tighter">{orders.filter(o => o.status === 'pending').length}</p>
+          <p className="text-xl sm:text-3xl font-black text-slate-800 tracking-tighter">{orders.filter(o => o.status === 'pending').length}</p>
         </div>
-        <div className="sleek-card p-6 rtl:text-right">
+        <div className="sleek-card p-4 sm:p-6 rtl:text-right flex flex-col justify-between">
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'إجمالي المنتجات' : 'Total Products'}</p>
-          <p className="text-3xl font-black text-slate-800 tracking-tighter">{products.length}</p>
+          <p className="text-xl sm:text-3xl font-black text-slate-800 tracking-tighter">{products.length}</p>
         </div>
-        <div className="sleek-card p-6 bg-slate-900 text-white border-none shadow-indigo-200 rtl:text-right">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'رابط المتجر' : 'Store Link'}</p>
-          <p className="text-sm font-mono truncate mb-2 text-slate-300">/store/{resolvedVendor.slug}</p>
+        <div className="sleek-card p-4 sm:p-6 bg-slate-900 text-white border-none shadow-indigo-200 rtl:text-right col-span-2 md:col-span-1 flex flex-col justify-between">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'رابط المتجر' : 'Store Link'}</p>
+            <p className="text-xs sm:text-sm font-mono truncate mb-2 text-slate-300">/store/{resolvedVendor.slug}</p>
+          </div>
           <div className="flex gap-2 rtl:flex-row-reverse">
             <button 
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/store/${resolvedVendor.slug}`);
                 alert(language === 'ar' ? 'تم النسخ!' : 'Copied!');
               }}
-              className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors border border-slate-700"
+              className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-colors border border-slate-700"
             >
               {language === 'ar' ? 'نسخ' : 'Copy'}
             </button>
             <Link 
               to={`/store/${resolvedVendor.slug}`}
-              className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold transition-colors text-center"
+              className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold transition-colors text-center"
             >
               {language === 'ar' ? 'عرض مباشر' : 'View Live'}
             </Link>
@@ -701,31 +718,31 @@ export default function VendorDashboard({ user }: DashboardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        {/* Sidebar/Mobile Nav */}
+      <div className="grid grid-cols-12 gap-4 lg:gap-8">
+        {/* Sidebar/Mobile Nav Tabs */}
         <div className="col-span-12 lg:col-span-3">
-          <div className="lg:block overflow-x-auto whitespace-nowrap lg:space-y-1 pb-4 lg:pb-0 -mx-4 px-4 lg:mx-0 lg:px-0">
+          <div className="flex lg:block overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap gap-2 pb-2 lg:pb-0 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 lg:space-y-1">
           {[
-            { id: 'orders', label: language === 'ar' ? 'طلبات مباشرة' : 'Live Orders', icon: <Clock className="w-4 h-4" /> },
-            { id: 'history', label: language === 'ar' ? 'سجل الطلبات' : 'Order History', icon: <History className="w-4 h-4" /> },
-            { id: 'products', label: language === 'ar' ? 'المنتجات' : 'Products', icon: <Package className="w-4 h-4" /> },
-            { id: 'customers', label: language === 'ar' ? 'قاعدة العملاء' : 'Customer Database', icon: <UserIcon className="w-4 h-4" /> },
-            { id: 'membership', label: language === 'ar' ? 'العضوية والخطط' : 'Membership', icon: <CreditCard className="w-4 h-4" /> },
-            { id: 'settings', label: language === 'ar' ? 'الإعدادات' : 'Settings', icon: <Globe className="w-4 h-4" /> },
+            { id: 'orders', label: language === 'ar' ? 'طلبات مباشرة' : 'Live Orders', icon: <Clock className="w-4 h-4 shrink-0" /> },
+            { id: 'history', label: language === 'ar' ? 'سجل الطلبات' : 'Order History', icon: <History className="w-4 h-4 shrink-0" /> },
+            { id: 'products', label: language === 'ar' ? 'المنتجات' : 'Products', icon: <Package className="w-4 h-4 shrink-0" /> },
+            { id: 'customers', label: language === 'ar' ? 'قاعدة العملاء' : 'Customer Database', icon: <UserIcon className="w-4 h-4 shrink-0" /> },
+            { id: 'membership', label: language === 'ar' ? 'العضوية والخطط' : 'Membership', icon: <CreditCard className="w-4 h-4 shrink-0" /> },
+            { id: 'settings', label: language === 'ar' ? 'الإعدادات' : 'Settings', icon: <Globe className="w-4 h-4 shrink-0" /> },
           ].map(item => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`inline-flex lg:flex items-center gap-3 px-4 py-3 lg:w-full rounded-xl font-bold text-sm transition-all rtl:flex-row-reverse mr-2 lg:mr-0 ${
+              className={`inline-flex lg:flex items-center gap-2.5 px-4 py-3 shrink-0 lg:w-full rounded-2xl font-black text-xs sm:text-sm transition-all rtl:flex-row-reverse ${
                 activeTab === item.id 
-                ? 'bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm' 
-                : 'text-slate-500 bg-white hover:bg-white hover:text-slate-800'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                : 'text-slate-600 bg-white hover:bg-slate-50 border border-slate-200/80'
               }`}
             >
               {item.icon}
-              {item.label}
+              <span>{item.label}</span>
               {item.id === 'orders' && orders.filter(o => o.status === 'arrived').length > 0 && (
-                <span className="mr-auto rtl:ml-auto w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="mr-auto rtl:ml-auto w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
               )}
             </button>
           ))}
@@ -733,7 +750,7 @@ export default function VendorDashboard({ user }: DashboardProps) {
         </div>
 
         {/* Content Area */}
-        <div className="col-span-12 lg:col-span-9 space-y-8">
+        <div className="col-span-12 lg:col-span-9 space-y-6 sm:space-y-8">
           {/* Arrival Alert Section */}
           <AnimatePresence>
             {orders.filter(o => o.status === 'arrived').map(order => (
@@ -742,27 +759,27 @@ export default function VendorDashboard({ user }: DashboardProps) {
                 initial={{ opacity: 0, y: -20, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-rose-500 rounded-3xl p-6 text-white shadow-2xl ring-8 ring-rose-500/10 relative overflow-hidden mb-6"
+                className="bg-rose-500 rounded-3xl p-4 sm:p-6 text-white shadow-2xl ring-8 ring-rose-500/10 relative overflow-hidden mb-6"
               >
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[10px] uppercase tracking-tighter bg-rose-600 px-2 py-0.5 rounded font-black">Arrival Now / وصلت الآن</span>
                       <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                     </div>
-                    <h3 className="text-3xl font-black mb-1">{order.carDetails?.type}</h3>
-                    <p className="text-rose-100 text-sm italic">{order.customerName} is waiting outside</p>
+                    <h3 className="text-2xl sm:text-3xl font-black mb-1">{order.carDetails?.type}</h3>
+                    <p className="text-rose-100 text-xs sm:text-sm italic">{order.customerName} is waiting outside</p>
                   </div>
                   
-                  <div className="flex items-center gap-6">
-                    <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-md flex flex-col border border-white/20">
-                      <span className="text-[10px] uppercase text-rose-200 font-bold mb-1">Plate / اللوحة</span>
-                      <span className="text-2xl font-mono font-black tracking-widest">{order.carDetails?.plate}</span>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6">
+                    <div className="bg-white/10 rounded-2xl p-3 sm:p-4 backdrop-blur-md flex flex-col border border-white/20">
+                      <span className="text-[10px] uppercase text-rose-200 font-bold mb-0.5">Plate / اللوحة</span>
+                      <span className="text-xl sm:text-2xl font-mono font-black tracking-widest">{order.carDetails?.plate}</span>
                     </div>
                     
                     <button 
                       onClick={() => updateDoc(doc(db, 'orders', order.id), { status: 'completed' })}
-                      className="h-full px-8 bg-white text-rose-600 rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-2 hover:bg-rose-50 transition-all active:scale-95"
+                      className="py-3.5 px-6 bg-white text-rose-600 rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-2 hover:bg-rose-50 transition-all active:scale-95"
                     >
                       <CheckCircle2 className="w-5 h-5" />
                       Handed Over
@@ -770,15 +787,15 @@ export default function VendorDashboard({ user }: DashboardProps) {
                   </div>
                 </div>
                 {/* Decorative car icon */}
-                <Car className="absolute -right-8 -bottom-8 w-48 h-48 text-rose-400 opacity-20" />
+                <Car className="absolute -right-8 -bottom-8 w-48 h-48 text-rose-400 opacity-20 pointer-events-none" />
               </motion.div>
             ))}
           </AnimatePresence>
 
           {activeTab === 'orders' && <OrdersList orders={orders.filter(o => o.status !== 'completed')} vendor={resolvedVendor} />}
           {activeTab === 'history' && <OrdersList orders={orders.filter(o => o.status === 'completed')} vendor={resolvedVendor} isHistory />}
-          {activeTab === 'products' && <ProductsList vendorId={resolvedVendor.id} products={products} vendor={resolvedVendor} />}
-          {activeTab === 'customers' && <CustomersPanel vendor={resolvedVendor} orders={orders} />}
+          {activeTab === 'products' && <ProductsList vendorId={resolvedVendor.id} products={products} vendor={resolvedVendor} onOpenUpgrade={() => setActiveTab('membership')} />}
+          {activeTab === 'customers' && <CustomersPanel vendor={resolvedVendor} orders={orders} onOpenUpgrade={() => setActiveTab('membership')} />}
           {activeTab === 'membership' && <MembershipPanel vendor={resolvedVendor} />}
           {activeTab === 'settings' && <SettingsPanel vendor={resolvedVendor} setActiveTab={setActiveTab} />}
         </div>
@@ -793,8 +810,37 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
   const [rechargingId, setRechargingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   
+  // Dynamic Payment Bank Details from Admin
+  const [adminPaymentDetails, setAdminPaymentDetails] = useState({
+    benefitPayPhone: '36368522',
+    accountHolder: 'Mursal Al-Bakery / Curbside GCC',
+    bankName: 'Al Salam Bank (بنك السلام)',
+    iban: 'BH25 ALSL 0000 3636 8522 0001'
+  });
+
+  useEffect(() => {
+    const fetchAdminPaymentDetails = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'payment');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAdminPaymentDetails({
+            benefitPayPhone: data.benefitPayPhone || '36368522',
+            accountHolder: data.accountHolder || 'Mursal Al-Bakery / Curbside GCC',
+            bankName: data.bankName || 'Al Salam Bank (بنك السلام)',
+            iban: data.iban || 'BH25 ALSL 0000 3636 8522 0001'
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching admin payment details:', err);
+      }
+    };
+    fetchAdminPaymentDetails();
+  }, []);
+  
   // Recharge & Payment States
-  const [selectedPackage, setSelectedPackage] = useState<{ id: number; nameAr: string; nameEn: string; credits: number; price: number; color: string; popular?: boolean } | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<{ id: number | string; nameAr: string; nameEn: string; credits?: number; price: number | string; color?: string; popular?: boolean; isPlan?: boolean } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'whatsapp'>('transfer');
   
   // Card states
@@ -982,11 +1028,14 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
       }
       
       if (selectedPackage) {
+        const isPlanUpgrade = Boolean(selectedPackage.isPlan);
+
         await addDoc(collection(db, 'recharge_requests'), {
           vendorId: vendor.id,
           vendorName: vendor.name,
           packageId: selectedPackage.id,
-          credits: selectedPackage.credits,
+          type: isPlanUpgrade ? 'subscription_upgrade' : 'ai_credits',
+          credits: selectedPackage.credits || 0,
           price: selectedPackage.price,
           method: 'bank_transfer',
           status: 'pending',
@@ -994,11 +1043,18 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
           timestamp: new Date().toISOString()
         });
         
-        // Temporarily or instantly add credits for perfect testing while storing the pending receipt for the admin's database!
-        const currentCredits = vendor.aiCredits !== undefined ? vendor.aiCredits : 10;
-        await updateDoc(doc(db, 'vendors', vendor.id), {
-          aiCredits: currentCredits + selectedPackage.credits
-        });
+        if (isPlanUpgrade) {
+          await updateDoc(doc(db, 'vendors', vendor.id), {
+            plan: String(selectedPackage.id),
+            subscriptionStatus: 'active',
+            subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
+        } else if (selectedPackage.credits) {
+          const currentCredits = vendor.aiCredits !== undefined ? vendor.aiCredits : 10;
+          await updateDoc(doc(db, 'vendors', vendor.id), {
+            aiCredits: currentCredits + selectedPackage.credits
+          });
+        }
         
         setTransferSuccess(true);
         setTimeout(() => {
@@ -1008,8 +1064,12 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
           setSelectedPackage(null);
           setSuccessMsg(
             language === 'ar' 
-              ? `تم رفع إيصال التحويل بنجاح! تم شحن ${selectedPackage.credits} رصيد ذكاء اصطناعي لمتجرك مؤقتاً لحين المراجعة المباشرة.`
-              : `Transfer receipt uploaded successfully! Temporarily recharged ${selectedPackage.credits} credits pending audit.`
+              ? isPlanUpgrade
+                ? `تم رفع إيصال التحويل بنجاح! تم استقبال طلب الترقية وتنشيط باقة (${selectedPackage.nameAr}) لمتجرك.`
+                : `تم رفع إيصال التحويل بنجاح! تم شحن ${selectedPackage.credits} رصيد ذكاء اصطناعي لمتجرك مؤقتاً لحين المراجعة المباشرة.`
+              : isPlanUpgrade
+                ? `Transfer receipt uploaded successfully! (${selectedPackage.nameEn}) plan activated for your store.`
+                : `Transfer receipt uploaded successfully! Temporarily recharged ${selectedPackage.credits} credits pending audit.`
           );
           setTimeout(() => setSuccessMsg(""), 5000);
         }, 2000);
@@ -1128,15 +1188,33 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
                 </ul>
 
                 {!isCurrent && (
-                  <button 
-                    onClick={() => handleUpgrade(plan.id)}
-                    disabled={upgradingPlanId !== null}
-                    className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                  >
-                    {isUpgradingThis 
-                      ? (language === 'ar' ? 'جاري الترقية...' : 'Upgrading...') 
-                      : (language === 'ar' ? 'ترقية الآن' : 'Upgrade Now')}
-                  </button>
+                  plan.id === 'enterprise' ? (
+                    <a 
+                      href={`https://wa.me/97336368522?text=${encodeURIComponent(
+                        language === 'ar' 
+                          ? `مرحباً، أرغب في الاستفسار والاشتراك في باقة الشركات لمتجري: ${vendor.name}` 
+                          : `Hello, I want to inquire about the Enterprise plan for my store: ${vendor.name}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full block text-center py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                    >
+                      {language === 'ar' ? 'تواصل عبر الواتساب 💬' : 'Contact via WhatsApp 💬'}
+                    </a>
+                  ) : (
+                    <button 
+                      onClick={() => setSelectedPackage({
+                        id: plan.id,
+                        nameAr: plan.name,
+                        nameEn: plan.name,
+                        price: plan.price || '15',
+                        isPlan: true
+                      })}
+                      className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95"
+                    >
+                      {language === 'ar' ? 'ترقية الآن' : 'Upgrade Now'}
+                    </button>
+                  )
                 )}
               </div>
             );
@@ -1246,12 +1324,18 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
                 </button>
                 <div className="text-right">
                   <h3 className="font-black text-slate-800 text-lg leading-tight">
-                    {language === 'ar' ? 'إتمام عملية الشحن والتحصيل' : 'Billing & Payment Details'}
+                    {language === 'ar' 
+                      ? (selectedPackage.isPlan ? 'إتمام طلب ترقية العضوية' : 'إتمام عملية الشحن والتحصيل') 
+                      : (selectedPackage.isPlan ? 'Complete Subscription Upgrade' : 'Billing & Payment Details')}
                   </h3>
                   <p className="text-xs text-slate-500 font-bold mt-1">
                     {language === 'ar' 
-                      ? `${selectedPackage.nameAr} • +${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب`
-                      : `${selectedPackage.nameEn} • +${selectedPackage.credits} Credits for ${selectedPackage.price} BHD`}
+                      ? selectedPackage.isPlan
+                        ? `ترقية إلى: ${selectedPackage.nameAr} • بقيمة ${selectedPackage.price} د.ب`
+                        : `${selectedPackage.nameAr} • +${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب`
+                      : selectedPackage.isPlan
+                        ? `Upgrade to: ${selectedPackage.nameEn} • Price ${selectedPackage.price} BHD`
+                        : `${selectedPackage.nameEn} • +${selectedPackage.credits} Credits for ${selectedPackage.price} BHD`}
                   </p>
                 </div>
               </div>
@@ -1299,20 +1383,20 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
                     <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl space-y-3 font-medium text-xs text-slate-700">
                       <div className="flex justify-between items-center rtl:flex-row-reverse">
                         <span className="text-slate-400">{language === 'ar' ? 'رقم بنفت بي:' : 'BenefitPay Mobile:'}</span>
-                        <span className="font-bold text-slate-800">36368522</span>
+                        <span className="font-bold text-slate-800">{adminPaymentDetails.benefitPayPhone}</span>
                       </div>
                       <div className="flex justify-between items-center rtl:flex-row-reverse">
                         <span className="text-slate-400">{language === 'ar' ? 'اسم المستلم:' : 'Account Holder:'}</span>
-                        <span className="font-bold text-slate-800">Mursal Al-Bakery / Curbside GCC</span>
+                        <span className="font-bold text-slate-800">{adminPaymentDetails.accountHolder}</span>
                       </div>
                       <div className="flex justify-between items-center rtl:flex-row-reverse">
                         <span className="text-slate-400">{language === 'ar' ? 'بنك المستلم:' : 'Receiver Bank:'}</span>
-                        <span className="font-bold text-slate-800">Al Salam Bank (بنك السلام)</span>
+                        <span className="font-bold text-slate-800">{adminPaymentDetails.bankName}</span>
                       </div>
                       <div className="flex justify-between items-start rtl:flex-row-reverse">
                         <span className="text-slate-400 shrink-0">{language === 'ar' ? 'رقم الآيبان (IBAN):' : 'IBAN:'}</span>
                         <span className="font-mono font-bold text-slate-800 text-right max-w-[200px] break-all leading-tight">
-                          BH25 ALSL 0000 3636 8522 0001
+                          {adminPaymentDetails.iban}
                         </span>
                       </div>
                     </div>
@@ -1375,7 +1459,9 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
                         >
                           {isUploadingReceipt 
                             ? (language === 'ar' ? 'جاري رفع الإيصال...' : 'Uploading proof...') 
-                            : (language === 'ar' ? 'إرسال إثبات الدفع وتفعيل الرصيد' : 'Submit Proof & Activate')}
+                            : (language === 'ar' 
+                                ? (selectedPackage.isPlan ? 'إرسال إثبات الدفع وتفعيل الترقية' : 'إرسال إثبات الدفع وتفعيل الرصيد') 
+                                : (selectedPackage.isPlan ? 'Submit Proof & Activate Plan' : 'Submit Proof & Activate Credits'))}
                         </button>
                       </div>
                     )}
@@ -1393,16 +1479,24 @@ function MembershipPanel({ vendor }: { vendor: Vendor }) {
                       </h4>
                       <p className="text-xs text-slate-500 leading-relaxed font-bold">
                         {language === 'ar' 
-                          ? `سيقوم هذا الخيار بإنشاء رسالة واتساب معرّفة تلقائياً لمتجرك لطلب شحن ${selectedPackage.credits} رصيد مباشرة من الدعم الفني بعد إرسال الحوالة البنكية.`
-                          : `This generates a pre-formatted message mentioning your store name to instantly coordinate manual payment and recharge with support.`}
+                          ? selectedPackage.isPlan
+                            ? `سيقوم هذا الخيار بإنشاء رسالة واتساب معرّفة تلقائياً لمتجرك لطلب ترقية الباقة إلى (${selectedPackage.nameAr}) مباشرة من الدعم الفني بعد إرسال الحوالة البنكية.`
+                            : `سيقوم هذا الخيار بإنشاء رسالة واتساب معرّفة تلقائياً لمتجرك لطلب شحن ${selectedPackage.credits} رصيد مباشرة من الدعم الفني بعد إرسال الحوالة البنكية.`
+                          : selectedPackage.isPlan
+                            ? `This generates a pre-formatted message to request upgrading your store plan to (${selectedPackage.nameEn}) directly with support.`
+                            : `This generates a pre-formatted message mentioning your store name to instantly coordinate manual payment and recharge with support.`}
                       </p>
                     </div>
 
                     <a 
                       href={`https://wa.me/97336368522?text=${encodeURIComponent(
                         language === 'ar' 
-                          ? `مرحباً، أرغب في تفعيل رصيد ذكاء اصطناعي لمتجري: ${vendor.name} (${selectedPackage.nameAr} - شحن ${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب).`
-                          : `Hello support, I want to recharge my AI credits for store ${vendor.name} (Package: ${selectedPackage.nameEn} - ${selectedPackage.credits} credits for ${selectedPackage.price} BHD).`
+                          ? selectedPackage.isPlan
+                            ? `مرحباً، أرغب في ترقية اشتراك متجري: ${vendor.name} إلى (${selectedPackage.nameAr} بقيمة ${selectedPackage.price} د.ب) وإرفاق إثبات الدفع.`
+                            : `مرحباً، أرغب في تفعيل رصيد ذكاء اصطناعي لمتجري: ${vendor.name} (${selectedPackage.nameAr} - شحن ${selectedPackage.credits} رصيد بقيمة ${selectedPackage.price} د.ب).`
+                          : selectedPackage.isPlan
+                            ? `Hello support, I want to upgrade my store subscription: ${vendor.name} to (${selectedPackage.nameEn} for ${selectedPackage.price} BHD).`
+                            : `Hello support, I want to recharge my AI credits for store ${vendor.name} (Package: ${selectedPackage.nameEn} - ${selectedPackage.credits} credits for ${selectedPackage.price} BHD).`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1819,7 +1913,7 @@ function OrdersList({ orders, vendor, isHistory }: { orders: Order[], vendor: Ve
   );
 }
 
-function ProductsList({ vendorId, products, vendor }: { vendorId: string, products: Product[], vendor: any }) {
+function ProductsList({ vendorId, products, vendor, onOpenUpgrade }: { vendorId: string, products: Product[], vendor: any, onOpenUpgrade?: () => void }) {
   const { language, isRTL } = useLanguage();
   const [showAdd, setShowAdd] = useState(false);
   const [showAIStudio, setShowAIStudio] = useState(false);
@@ -2098,22 +2192,35 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
               </div>
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase mb-2">{language === 'ar' ? 'السعر الأساسي (BHD)' : 'Base Price (BHD)'}</label>
-                <input 
-                  required 
-                  type="number" 
-                  step="0.1"
-                  value={newData.price} 
-                  onChange={e => setNewData({...newData, price: Number(e.target.value)})}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white font-bold text-right rtl:text-right"
-                />
+                <div className="relative">
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={newData.price === 0 ? '' : newData.price} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewData({...newData, price: val === '' ? 0 : parseFloat(val) || 0});
+                    }}
+                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white font-bold text-slate-900 text-right rtl:text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">BHD</span>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase mb-2">{language === 'ar' ? 'المخزون المتوفر' : 'Stock Level'}</label>
                 <input 
                   type="number" 
-                  value={newData.stock} 
-                  onChange={e => setNewData({...newData, stock: Number(e.target.value)})}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white font-bold text-right rtl:text-right"
+                  inputMode="numeric"
+                  value={newData.stock === 0 ? '' : newData.stock} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewData({...newData, stock: val === '' ? 0 : parseInt(val, 10) || 0});
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 bg-white font-bold text-slate-900 text-right rtl:text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                 />
                 <p className="text-[10px] text-slate-400 mt-1 font-bold rtl:text-right">
@@ -2394,40 +2501,58 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                 
                 <div className="grid grid-cols-1 gap-4">
                   {newData.sizes.map((size, index) => (
-                    <div key={size.id} className="flex flex-col sm:flex-row gap-4 bg-slate-50/50 p-6 rounded-[1.5rem] border border-slate-100 shadow-sm relative group items-center">
+                    <div key={size.id} className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-slate-50/50 p-3.5 sm:p-5 rounded-2xl sm:rounded-[1.5rem] border border-slate-100 shadow-sm relative group items-stretch sm:items-center">
                       {/* Visual Interactive Icon Preview */}
-                      <div className="flex flex-col items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-slate-50 w-24">
-                        {newData.category === 'drink' ? (
-                          <CupSoda className={`text-indigo-600 transition-all duration-300 ${
-                            size.label === 'S' ? 'w-6 h-6 scale-90' : 
-                            size.label === 'M' ? 'w-8 h-8 scale-100' : 
-                            size.label === 'L' ? 'w-10 h-10 scale-110' : 'w-12 h-12 scale-125'
-                          }`} />
-                        ) : newData.category === 'meal' ? (
-                          <ShoppingBag className={`text-orange-600 transition-all duration-300 ${
-                            size.label === 'Single' ? 'w-6 h-6 scale-90' : 
-                            size.label === 'Double' ? 'w-8 h-8 scale-100' : 
-                            size.label === 'Family' ? 'w-10 h-10 scale-110' : 'w-12 h-12 scale-125'
-                          }`} />
-                        ) : newData.category === 'canned' ? (
-                          <ShoppingCart className={`text-emerald-600 transition-all duration-300 ${
-                            size.label === 'Small' ? 'w-6 h-6 scale-90' : 
-                            size.label === 'Standard' ? 'w-8 h-8 scale-100' : 'w-12 h-12 scale-125'
-                          }`} />
-                        ) : (
-                          <Package className={`text-slate-600 transition-all duration-300 ${
-                            size.label === 'S' ? 'w-6 h-6 scale-90' : 
-                            size.label === 'M' ? 'w-8 h-8 scale-100' : 
-                            size.label === 'L' ? 'w-10 h-10 scale-110' : 'w-12 h-12 scale-125'
-                          }`} />
-                        )}
-                        <span className="mt-2 text-[10px] font-black text-slate-600 truncate w-full text-center">{size.label}</span>
+                      <div className="flex items-center justify-between sm:flex-col sm:justify-center p-2.5 sm:p-3 bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100/80 shrink-0">
+                        <div className="flex items-center gap-2 sm:flex-col sm:gap-0">
+                          {newData.category === 'drink' ? (
+                            <CupSoda className={`text-indigo-600 transition-all duration-300 ${
+                              size.label === 'S' ? 'w-5 h-5 sm:w-6 sm:h-6 scale-90' : 
+                              size.label === 'M' ? 'w-6 h-6 sm:w-8 sm:h-8 scale-100' : 
+                              size.label === 'L' ? 'w-7 h-7 sm:w-10 sm:h-10 scale-110' : 'w-8 h-8 sm:w-12 sm:h-12 scale-125'
+                            }`} />
+                          ) : newData.category === 'meal' ? (
+                            <ShoppingBag className={`text-orange-600 transition-all duration-300 ${
+                              size.label === 'Single' ? 'w-5 h-5 sm:w-6 sm:h-6 scale-90' : 
+                              size.label === 'Double' ? 'w-6 h-6 sm:w-8 sm:h-8 scale-100' : 
+                              size.label === 'Family' ? 'w-7 h-7 sm:w-10 sm:h-10 scale-110' : 'w-8 h-8 sm:w-12 sm:h-12 scale-125'
+                            }`} />
+                          ) : newData.category === 'canned' ? (
+                            <ShoppingCart className={`text-emerald-600 transition-all duration-300 ${
+                              size.label === 'Small' ? 'w-5 h-5 sm:w-6 sm:h-6 scale-90' : 
+                              size.label === 'Standard' ? 'w-6 h-6 sm:w-8 sm:h-8 scale-100' : 'w-8 h-8 sm:w-12 sm:h-12 scale-125'
+                            }`} />
+                          ) : (
+                            <Package className={`text-slate-600 transition-all duration-300 ${
+                              size.label === 'S' ? 'w-5 h-5 sm:w-6 sm:h-6 scale-90' : 
+                              size.label === 'M' ? 'w-6 h-6 sm:w-8 sm:h-8 scale-100' : 
+                              size.label === 'L' ? 'w-7 h-7 sm:w-10 sm:h-10 scale-110' : 'w-8 h-8 sm:w-12 sm:h-12 scale-125'
+                            }`} />
+                          )}
+                          <span className="text-xs sm:text-[10px] font-black text-slate-700 sm:text-slate-600 sm:mt-1.5">{size.label}</span>
+                        </div>
+
+                        {/* Mobile delete button */}
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setNewData({
+                              ...newData,
+                              sizes: newData.sizes.filter((_, i) => i !== index)
+                            });
+                          }}
+                          className="sm:hidden p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 active:scale-95 rounded-xl border border-rose-100 transition-all"
+                          title={language === 'ar' ? 'حذف الحجم' : 'Delete Size'}
+                          aria-label={language === 'ar' ? 'حذف الحجم' : 'Delete Size'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full rtl:text-right">
-                        <div className="space-y-2">
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full rtl:text-right">
+                        <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 uppercase">{language === 'ar' ? 'رمز / نوع الميزة' : 'Size Label'}</label>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
                             {getLabelOptions(newData.category).map(label => (
                               <button
                                 key={label}
@@ -2437,9 +2562,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                                   updated[index].label = label;
                                   setNewData({ ...newData, sizes: updated });
                                 }}
-                                className={`flex-1 py-2 rounded-lg text-xs font-black border-2 transition-all ${
+                                className={`flex-1 min-w-[44px] py-1.5 px-2 rounded-xl text-xs font-black border-2 transition-all ${
                                   size.label === label 
-                                    ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
                                     : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-200'
                                 }`}
                               >
@@ -2449,7 +2574,7 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                           </div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 uppercase">{language === 'ar' ? 'الاسم والسعر' : 'Name & Price'}</label>
                           <div className="flex gap-2">
                             <input 
@@ -2462,27 +2587,32 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                                 updated[index].name = e.target.value;
                                 setNewData({ ...newData, sizes: updated });
                               }}
-                              className="flex-1 px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-sm font-bold bg-white text-right rtl:text-right"
+                              className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-xs sm:text-sm font-bold bg-white text-slate-900 text-right rtl:text-right"
                             />
-                            <div className="relative w-32">
+                            <div className="relative w-24 sm:w-36 shrink-0">
                               <input 
                                 required 
                                 type="number" 
-                                step="0.1"
-                                value={size.price} 
+                                step="0.01"
+                                min="0"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={size.price === 0 ? '' : size.price} 
                                 onChange={e => {
+                                  const val = e.target.value;
                                   const updated = [...newData.sizes];
-                                  updated[index].price = Number(e.target.value);
+                                  updated[index].price = val === '' ? 0 : parseFloat(val) || 0;
                                   setNewData({ ...newData, sizes: updated });
                                 }}
-                                className="w-full pl-4 pr-10 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-sm font-bold bg-white text-right rtl:text-right"
+                                className="w-full pl-9 pr-2.5 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-xs sm:text-sm font-bold bg-white text-slate-900 text-right rtl:text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-400">BHD</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 pointer-events-none">BHD</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
+                      {/* Desktop delete button */}
                       <button 
                         type="button" 
                         onClick={() => {
@@ -2491,8 +2621,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                             sizes: newData.sizes.filter((_, i) => i !== index)
                           });
                         }}
-                        className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl border border-transparent hover:border-rose-100 transition-all hover:scale-105 shrink-0 self-center"
+                        className="hidden sm:flex p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 active:scale-95 rounded-2xl border border-rose-100 transition-all shrink-0 self-center"
                         title={language === 'ar' ? 'حذف الحجم' : 'Delete Size'}
+                        aria-label={language === 'ar' ? 'حذف الحجم' : 'Delete Size'}
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -2522,7 +2653,7 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
               </div>
               
               {newData.addons.map((addon, index) => (
-                <div key={addon.id} className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm rtl:flex-row-reverse">
+                <div key={addon.id} className="flex gap-2 sm:gap-3 items-center bg-white p-2.5 sm:p-3 rounded-xl border border-slate-100 shadow-sm rtl:flex-row-reverse w-full">
                   <input 
                     required 
                     type="text" 
@@ -2533,23 +2664,26 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                       updated[index].name = e.target.value;
                       setNewData({ ...newData, addons: updated });
                     }}
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-100 outline-none focus:border-indigo-500 text-sm font-bold text-right rtl:text-right"
+                    className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-slate-100 outline-none focus:border-indigo-500 text-xs sm:text-sm font-bold text-right rtl:text-right bg-white text-slate-900"
                   />
-                  <div className="w-32 flex items-center gap-2 rtl:flex-row-reverse">
+                  <div className="relative w-24 sm:w-32 shrink-0">
                     <input 
                       required 
                       type="number" 
-                      step="0.1"
-                      placeholder="0.0"
-                      value={addon.price} 
+                      step="0.01"
+                      min="0"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={addon.price === 0 ? '' : addon.price} 
                       onChange={e => {
+                        const val = e.target.value;
                         const updated = [...newData.addons];
-                        updated[index].price = Number(e.target.value);
+                        updated[index].price = val === '' ? 0 : parseFloat(val) || 0;
                         setNewData({ ...newData, addons: updated });
                       }}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-100 outline-none focus:border-indigo-500 text-sm font-bold text-right rtl:text-right"
+                      className="w-full pl-9 pr-2.5 py-2 rounded-lg border border-slate-100 outline-none focus:border-indigo-500 text-xs sm:text-sm font-bold bg-white text-slate-900 text-right rtl:text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                    <span className="text-[10px] font-bold text-slate-400">BHD</span>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 pointer-events-none">BHD</span>
                   </div>
                   <button 
                     type="button" 
@@ -2559,7 +2693,9 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
                         addons: newData.addons.filter((_, i) => i !== index)
                       });
                     }}
-                    className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                    className="p-2 sm:p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 active:scale-95 rounded-xl border border-rose-100 transition-all shrink-0 flex items-center justify-center"
+                    title={language === 'ar' ? 'حذف الإضافة' : 'Delete Addon'}
+                    aria-label={language === 'ar' ? 'حذف الإضافة' : 'Delete Addon'}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -2668,6 +2804,10 @@ function ProductsList({ vendorId, products, vendor }: { vendorId: string, produc
               }));
             }}
             onClose={() => setShowAIStudio(false)}
+            onOpenUpgrade={() => {
+              setShowAIStudio(false);
+              if (onOpenUpgrade) onOpenUpgrade();
+            }}
           />
         )}
       </AnimatePresence>
@@ -2794,34 +2934,34 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
   const storeUrl = vendor.customDomain ? `https://${vendor.customDomain}` : `${window.location.origin}/store/${vendor.slug}`;
   
   return (
-    <div className="space-y-8 pb-20 rtl:text-right">
-      <div className="flex justify-between items-center mb-4 rtl:flex-row-reverse">
-        <h3 className="text-3xl font-black tracking-tight text-slate-800">{language === 'ar' ? 'إعدادات المتجر' : 'Store Settings'}</h3>
+    <div className="space-y-4 sm:space-y-8 pb-20 rtl:text-right">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2 sm:mb-4 rtl:flex-row-reverse">
+        <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-800">{language === 'ar' ? 'إعدادات المتجر' : 'Store Settings'}</h3>
         <button 
           onClick={saveSettings}
           disabled={saving}
-          className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+          className="w-full sm:w-auto bg-indigo-600 text-white px-6 sm:px-8 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 text-xs sm:text-sm"
         >
           <Save className="w-4 h-4" />
           {saving ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التغييرات' : 'Save All Changes')}
         </button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Visual Identity Section */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-            <h4 className="font-black text-lg mb-6 flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <h4 className="font-black text-base sm:text-lg mb-4 sm:mb-6 flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
               <ImageIcon className="w-5 h-5 text-indigo-600" />
               {language === 'ar' ? 'الهوية البصرية' : 'Visual Identity'}
             </h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
               {/* Logo Upload */}
               <div className="flex flex-col items-center">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{language === 'ar' ? 'شعار المتجر' : 'Store Logo'}</p>
                 <div className="relative group">
-                  <div className="w-32 h-32 rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl sm:rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
                     {isUploadingLogo ? (
                       <div className="flex flex-col items-center justify-center p-2">
                         <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -2840,7 +2980,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                     disabled={isUploadingLogo}
                   />
                   {!isUploadingLogo && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] flex items-center justify-center text-white text-xs font-black pointer-events-none">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl sm:rounded-[2.5rem] flex items-center justify-center text-white text-xs font-black pointer-events-none">
                       {language === 'ar' ? 'تغيير الشعار' : 'Change Logo'}
                     </div>
                   )}
@@ -2850,8 +2990,8 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               {/* Banner Upload */}
               <div className="flex flex-col">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{language === 'ar' ? 'غلاف المتجر' : 'Store Banner'}</p>
-                <div className="relative group h-32 w-full">
-                  <div className="w-full h-full rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
+                <div className="relative group h-28 sm:h-32 w-full">
+                  <div className="w-full h-full rounded-2xl sm:rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
                     {isUploadingBanner ? (
                       <div className="flex flex-col items-center justify-center gap-2">
                         <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -2874,7 +3014,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                     disabled={isUploadingBanner}
                   />
                   {formData.bannerUrl && !isUploadingBanner && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl flex items-center justify-center text-white text-xs font-black pointer-events-none">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl sm:rounded-3xl flex items-center justify-center text-white text-xs font-black pointer-events-none">
                       {language === 'ar' ? 'تغيير الغلاف' : 'Change Banner'}
                     </div>
                   )}
@@ -2885,8 +3025,8 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
         </div>
 
         {/* Store Profile Section */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-          <h4 className="font-black text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+        <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4 sm:space-y-6">
+          <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
             <UserIcon className="w-5 h-5 text-indigo-600" />
             {language === 'ar' ? 'ملف المتجر' : 'Store Profile'}
           </h4>
@@ -2898,7 +3038,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 type="text" 
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})}
-                className="w-full px-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-right rtl:text-right"
+                className="w-full px-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-right rtl:text-right text-xs sm:text-sm"
               />
             </div>
             <div>
@@ -2907,16 +3047,16 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 rows={3}
                 value={formData.description} 
                 onChange={e => setFormData({...formData, description: e.target.value})}
-                className="w-full px-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-right rtl:text-right"
+                className="w-full px-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-right rtl:text-right text-xs sm:text-sm"
                 placeholder={language === 'ar' ? 'أخبر عملائك عن متجرك...' : 'Tell customers about your store...'}
               />
             </div>
             
             {/* Visibility Toggle */}
             <div className="pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 rtl:flex-row-reverse">
+              <div className="flex items-center justify-between p-3.5 sm:p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 rtl:flex-row-reverse">
                 <div className="flex items-center gap-3 rtl:flex-row-reverse">
-                  <div className={`p-2 rounded-xl ${formData.isPublic ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                  <div className={`p-2 rounded-xl shrink-0 ${formData.isPublic ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
                     {formData.isPublic ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                   </div>
                   <div>
@@ -2927,7 +3067,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 <button 
                   type="button"
                   onClick={() => setFormData({...formData, isPublic: !formData.isPublic})}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.isPublic ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${formData.isPublic ? 'bg-indigo-600' : 'bg-slate-200'}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isPublic ? (isRTL ? '-translate-x-6' : 'translate-x-6') : (isRTL ? '-translate-x-1' : 'translate-x-1')}`} />
                 </button>
@@ -2937,8 +3077,8 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
         </div>
 
         {/* Contact & Social Section */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-          <h4 className="font-black text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+        <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4 sm:space-y-6">
+          <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
             <Instagram className="w-5 h-5 text-indigo-600" />
             {language === 'ar' ? 'التواصل والشبكات الاجتماعية' : 'Contact & Social'}
           </h4>
@@ -2947,12 +3087,12 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'واتساب / الهاتف' : 'WhatsApp / Phone'}</label>
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
-                <Phone className="w-4 h-4 text-slate-400" />
+                <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                 <input 
                   type="text" 
                   value={formData.phone} 
                   onChange={e => setFormData({...formData, phone: e.target.value})}
-                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right"
+                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right text-xs sm:text-sm"
                   placeholder="e.g. +973 36368522"
                 />
               </div>
@@ -2960,13 +3100,13 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'حساب إنستغرام' : 'Instagram Handle'}</label>
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
-                <Instagram className="w-4 h-4 text-slate-400" />
+                <Instagram className="w-4 h-4 text-slate-400 shrink-0" />
                 <span className="text-slate-400 font-bold">@</span>
                 <input 
                   type="text" 
                   value={formData.instagram} 
                   onChange={e => setFormData({...formData, instagram: e.target.value})}
-                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right"
+                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right text-xs sm:text-sm"
                   placeholder="store_username"
                 />
               </div>
@@ -2974,12 +3114,12 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'اسم المنطقة / العنوان العام' : 'General Area / Mall / Complex'}</label>
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
-                <MapPin className="w-4 h-4 text-slate-400" />
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                 <input 
                   type="text" 
                   value={formData.location} 
                   onChange={e => setFormData({...formData, location: e.target.value})}
-                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right"
+                  className="bg-transparent outline-none flex-1 font-bold text-right rtl:text-right text-xs sm:text-sm"
                   placeholder="e.g. Seef Mall, Manama"
                 />
               </div>
@@ -2988,7 +3128,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'رابط الموقع على قوقل ماب' : 'Google Maps Location Link'}</label>
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 rtl:flex-row-reverse">
-                <Globe className="w-4 h-4 text-slate-400" />
+                <Globe className="w-4 h-4 text-slate-400 shrink-0" />
                 <input 
                   type="url" 
                   value={formData.mapUrl} 
@@ -3004,34 +3144,34 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 md:col-span-2">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 md:col-span-2">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'المبنى / البيت / المحل' : 'Building / Shop'}</label>
+                <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 truncate">{language === 'ar' ? 'المبنى / المحل' : 'Building / Shop'}</label>
                 <input 
                   type="text" 
                   value={formData.buildingNo} 
                   onChange={e => setFormData({...formData, buildingNo: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  className="w-full px-2.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center text-xs sm:text-sm"
                   placeholder="e.g. 124"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الطريق / الشارع' : 'Road / Street'}</label>
+                <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 truncate">{language === 'ar' ? 'الطريق / الشارع' : 'Road / Street'}</label>
                 <input 
                   type="text" 
                   value={formData.roadNo} 
                   onChange={e => setFormData({...formData, roadNo: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  className="w-full px-2.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center text-xs sm:text-sm"
                   placeholder="e.g. 2804"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'المجمع' : 'Block'}</label>
+                <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 truncate">{language === 'ar' ? 'المجمع' : 'Block'}</label>
                 <input 
                   type="text" 
                   value={formData.blockNo} 
                   onChange={e => setFormData({...formData, blockNo: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center"
+                  className="w-full px-2.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-center text-xs sm:text-sm"
                   placeholder="e.g. 428"
                 />
               </div>
@@ -3043,7 +3183,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 type="text" 
                 value={formData.city} 
                 onChange={e => setFormData({...formData, city: e.target.value})}
-                className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-right rtl:text-right"
+                className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 font-bold text-right rtl:text-right text-xs sm:text-sm"
                 placeholder={language === 'ar' ? 'المنامة، ضاحية السيف' : 'Seef, Manama'}
               />
             </div>
@@ -3051,33 +3191,33 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
         </div>
 
         {/* Links & Payments Section */}
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right">
-            <h4 className="font-black text-lg mb-6 flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right">
+            <h4 className="font-black text-base sm:text-lg mb-4 sm:mb-6 flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
               <Globe className="w-5 h-5 text-indigo-600" />
               {language === 'ar' ? 'رابط المتجر المباشر' : 'Live Store URL'}
             </h4>
-            <div className="flex gap-2 rtl:flex-row-reverse">
+            <div className="flex flex-col sm:flex-row gap-2 rtl:flex-row-reverse">
               <input 
                 readOnly 
                 value={storeUrl} 
-                className="flex-1 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-500 font-mono text-xs"
+                className="w-full sm:flex-1 px-3.5 py-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-500 font-mono text-xs overflow-x-auto truncate"
               />
               <button 
                 onClick={() => {
                   navigator.clipboard.writeText(storeUrl);
                   alert(language === 'ar' ? 'تم النسخ!' : 'Copied!');
                 }}
-                className="bg-indigo-50 text-indigo-600 px-4 rounded-xl font-black text-xs hover:bg-indigo-100 transition-colors"
+                className="w-full sm:w-auto bg-indigo-50 text-indigo-600 px-5 py-2.5 sm:py-0 rounded-xl font-black text-xs hover:bg-indigo-100 transition-colors"
               >
                 {language === 'ar' ? 'نسخ' : 'Copy'}
               </button>
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right">
-            <div className="flex justify-between items-center mb-6 rtl:flex-row-reverse">
-              <h4 className="font-black text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right">
+            <div className="flex justify-between items-center mb-4 sm:mb-6 rtl:flex-row-reverse">
+              <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
                 <CreditCard className="w-5 h-5 text-indigo-600" />
                 {language === 'ar' ? 'معلومات الدفع (IBAN)' : 'Payout Info (IBAN)'}
               </h4>
@@ -3091,13 +3231,13 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               )}
             </div>
             {isEditingIban ? (
-              <div className="flex gap-2 rtl:flex-row-reverse">
+              <div className="flex flex-col sm:flex-row gap-2 rtl:flex-row-reverse">
                 <input 
                   type="text" 
                   value={formData.iban} 
                   onChange={e => setFormData({...formData, iban: e.target.value.toUpperCase()})}
-                  className="flex-1 px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:border-indigo-500 bg-white font-mono font-bold shadow-sm"
-                  placeholder="SA00 0000..."
+                  className="w-full sm:flex-1 px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:border-indigo-500 bg-white font-mono font-bold shadow-sm text-xs sm:text-sm"
+                  placeholder="BH00 0000..."
                   autoFocus
                 />
                 <button 
@@ -3105,32 +3245,32 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                     setIsEditingIban(false);
                     await saveSettings();
                   }}
-                  className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition-all flex items-center justify-center min-w-[60px]"
+                  className="w-full sm:w-auto bg-indigo-600 text-white px-5 py-3 rounded-xl text-xs font-black hover:bg-indigo-700 transition-all flex items-center justify-center min-w-[60px]"
                   disabled={saving}
                 >
                   {saving ? '...' : (language === 'ar' ? 'تم' : 'Done')}
                 </button>
               </div>
             ) : (
-              <div className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 font-mono font-bold text-slate-600 flex justify-between items-center rtl:flex-row-reverse">
-                <span>{formData.iban || (language === 'ar' ? 'لم يتم التحديد' : 'Not specified')}</span>
-                <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">Verified</span>
+              <div className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 font-mono font-bold text-slate-600 text-xs sm:text-sm flex justify-between items-center rtl:flex-row-reverse">
+                <span className="truncate">{formData.iban || (language === 'ar' ? 'لم يتم التحديد' : 'Not specified')}</span>
+                <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest shrink-0">Verified</span>
               </div>
             )}
           </div>
 
           {/* Custom Domain Settings Card */}
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right md:col-span-2 relative overflow-hidden group">
+          <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm rtl:text-right md:col-span-2 relative overflow-hidden group">
             {/* Lock Overlay for Starter Plan */}
             {!(vendor.plan === 'pro' || vendor.plan === 'enterprise') && (
-              <div className="absolute inset-0 bg-slate-50/70 backdrop-blur-[3px] z-20 flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4 shadow-sm border border-indigo-100/50">
-                  <Lock className="w-7 h-7" />
+              <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-[3px] z-20 flex flex-col items-center justify-center p-4 sm:p-6 text-center">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-3 sm:mb-4 shadow-sm border border-indigo-100/50">
+                  <Lock className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
-                <h4 className="text-lg font-black text-slate-800 mb-2">
+                <h4 className="text-base sm:text-lg font-black text-slate-800 mb-1 sm:mb-2">
                   {language === 'ar' ? 'ربط نطاق مخصص (باقة برو) 🔒' : 'Custom Domain (Pro Feature) 🔒'}
                 </h4>
-                <p className="text-xs text-slate-500 font-bold max-w-md mb-6 leading-relaxed">
+                <p className="text-xs text-slate-500 font-bold max-w-md mb-4 sm:mb-6 leading-relaxed px-2">
                   {language === 'ar' 
                     ? 'هذه الميزة متاحة فقط للمشتركين في باقة برو أو أعلى. اربط متجرك بنطاقك المخصص لبناء هوية تجارية مستقلة واحترافية.' 
                     : 'This feature is exclusive to Pro plan subscribers. Connect your own domain to build an independent, professional brand identity.'}
@@ -3139,7 +3279,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                   onClick={() => {
                     if (setActiveTab) setActiveTab('membership');
                   }}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-md active:scale-95 flex items-center gap-2"
+                  className="px-5 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-md active:scale-95 flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4 text-white animate-pulse" />
                   <span>{language === 'ar' ? 'الترقية إلى باقة برو الآن' : 'Upgrade to Pro Plan Now'}</span>
@@ -3147,8 +3287,8 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 rtl:flex-row-reverse">
-              <h4 className="font-black text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6 rtl:flex-row-reverse">
+              <h4 className="font-black text-base sm:text-lg flex items-center gap-2 text-slate-800 rtl:flex-row-reverse">
                 <Globe className="w-5 h-5 text-indigo-600" />
                 {language === 'ar' ? 'ربط نطاق مخصص (الدومين)' : 'Connect Custom Domain'}
               </h4>
@@ -3164,14 +3304,14 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
             </p>
 
             <div className="space-y-4">
-              <div className="flex gap-2 rtl:flex-row-reverse max-w-xl">
+              <div className="flex flex-col sm:flex-row gap-2 rtl:flex-row-reverse max-w-xl">
                 <div className="relative flex-1">
-                  <span className="absolute left-4 top-3.5 text-xs font-bold text-slate-400 select-none">https://</span>
+                  <span className="absolute left-3.5 top-3.5 text-xs font-bold text-slate-400 select-none">https://</span>
                   <input 
                     type="text" 
                     value={formData.customDomain} 
                     onChange={e => setFormData({...formData, customDomain: e.target.value.toLowerCase().replace(/https?:\/\//, '').trim()})}
-                    className="w-full pl-16 pr-4 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-left"
+                    className="w-full pl-16 pr-3.5 py-3 rounded-xl border border-slate-100 outline-none focus:border-indigo-500 bg-slate-50/50 font-bold text-left text-xs sm:text-sm"
                     placeholder="my-shop.com"
                   />
                 </div>
@@ -3179,7 +3319,7 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                   onClick={async () => {
                     await saveSettings();
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-xl font-black text-xs transition-all flex items-center justify-center whitespace-nowrap active:scale-95"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 sm:py-0 rounded-xl font-black text-xs transition-all flex items-center justify-center whitespace-nowrap active:scale-95"
                   disabled={saving}
                 >
                   {saving ? '...' : (language === 'ar' ? 'حفظ النطاق' : 'Save Domain')}
@@ -3190,17 +3330,17 @@ function SettingsPanel({ vendor, setActiveTab }: { vendor: Vendor; setActiveTab?
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4"
+                  className="p-3.5 sm:p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 sm:space-y-4"
                 >
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
                     <span className="text-xs font-black text-slate-700">{language === 'ar' ? 'إعدادات الـ DNS المطلوبة:' : 'Required DNS Settings:'}</span>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       {language === 'ar' ? 'متصل ومفعل' : 'Connected & Active'}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs text-slate-600 text-left">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 font-mono text-xs text-slate-600 text-left">
                     <div>
                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'نوع السجل' : 'Record Type'}</div>
                       <div className="bg-white px-3 py-2 rounded-lg border border-slate-200/60 font-bold text-indigo-600">CNAME</div>

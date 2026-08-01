@@ -27,7 +27,15 @@ import {
   Clock,
   Phone,
   Eye,
-  EyeOff
+  EyeOff,
+  Landmark,
+  Wallet,
+  Copy,
+  MapPin,
+  Sparkles,
+  User,
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { format } from 'date-fns';
@@ -45,6 +53,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAdmin) {
       fetchVendors();
+      fetchPaymentSettings();
       fetchContactSettings();
       fetchInquiries();
     }
@@ -55,7 +64,15 @@ export default function AdminDashboard() {
   }
 
   // Tabs layout
-  const [activeTab, setActiveTab] = useState<'vendors' | 'contact_settings' | 'inquiries'>('vendors');
+  const [activeTab, setActiveTab] = useState<'vendors' | 'payment_settings' | 'contact_settings' | 'inquiries'>('vendors');
+
+  // Payment settings state
+  const [benefitPayPhone, setBenefitPayPhone] = useState('36368522');
+  const [accountHolder, setAccountHolder] = useState('Mursal Al-Bakery / Curbside GCC');
+  const [bankName, setBankName] = useState('Al Salam Bank (بنك السلام)');
+  const [iban, setIban] = useState('BH25 ALSL 0000 3636 8522 0001');
+  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
+  const [paymentSettingsSuccess, setPaymentSettingsSuccess] = useState(false);
 
   // Contact settings state
   const [supportEmail, setSupportEmail] = useState('support@jareeb.com');
@@ -68,6 +85,44 @@ export default function AdminDashboard() {
   // User Inquiries state
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [loadingInquiries, setLoadingInquiries] = useState(false);
+
+  const fetchPaymentSettings = async () => {
+    try {
+      const docRef = doc(db, 'settings', 'payment');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.benefitPayPhone) setBenefitPayPhone(data.benefitPayPhone);
+        if (data.accountHolder) setAccountHolder(data.accountHolder);
+        if (data.bankName) setBankName(data.bankName);
+        if (data.iban) setIban(data.iban);
+      }
+    } catch (error) {
+      console.error('Error fetching payment settings:', error);
+    }
+  };
+
+  const handleSavePaymentSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingPaymentSettings(true);
+    setPaymentSettingsSuccess(false);
+    try {
+      await setDoc(doc(db, 'settings', 'payment'), {
+        benefitPayPhone: benefitPayPhone.trim(),
+        accountHolder: accountHolder.trim(),
+        bankName: bankName.trim(),
+        iban: iban.trim(),
+        updatedAt: new Date().toISOString()
+      });
+      setPaymentSettingsSuccess(true);
+      setTimeout(() => setPaymentSettingsSuccess(false), 4000);
+    } catch (error) {
+      console.error('Error saving payment settings:', error);
+      alert(language === 'ar' ? 'فشل حفظ بيانات الحساب البنكي للدفع' : 'Failed to save payment settings');
+    } finally {
+      setSavingPaymentSettings(false);
+    }
+  };
 
   const fetchContactSettings = async () => {
     try {
@@ -275,10 +330,10 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 mt-8">
         
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 mb-8 gap-6 rtl:flex-row-reverse">
+        <div className="flex border-b border-slate-200 mb-8 gap-6 rtl:flex-row-reverse overflow-x-auto">
           <button
             onClick={() => setActiveTab('vendors')}
-            className={`pb-4 text-sm font-black transition-all border-b-2 ${
+            className={`pb-4 text-sm font-black transition-all border-b-2 whitespace-nowrap ${
               activeTab === 'vendors'
                 ? 'border-indigo-600 text-indigo-600 font-extrabold'
                 : 'border-transparent text-slate-400 hover:text-slate-600 font-semibold'
@@ -287,11 +342,21 @@ export default function AdminDashboard() {
             {language === 'ar' ? 'إدارة المتاجر والاشتراكات' : 'Store Subscriptions'}
           </button>
           <button
+            onClick={() => setActiveTab('payment_settings')}
+            className={`pb-4 text-sm font-black transition-all border-b-2 whitespace-nowrap ${
+              activeTab === 'payment_settings'
+                ? 'border-indigo-600 text-indigo-600 font-extrabold'
+                : 'border-transparent text-slate-400 hover:text-slate-600 font-semibold'
+            }`}
+          >
+            {language === 'ar' ? 'بيانات الحساب للدفع (IBAN)' : 'Payment Account Details'}
+          </button>
+          <button
             onClick={() => setActiveTab('contact_settings')}
-            className={`pb-4 text-sm font-black transition-all border-b-2 ${
+            className={`pb-4 text-sm font-black transition-all border-b-2 whitespace-nowrap ${
               activeTab === 'contact_settings'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'border-indigo-600 text-indigo-600 font-extrabold'
+                : 'border-transparent text-slate-400 hover:text-slate-600 font-semibold'
             }`}
           >
             {language === 'ar' ? 'إعدادات قنوات التواصل' : 'Contact Channels Settings'}
@@ -377,102 +442,218 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Vendors List */}
-            <div className="space-y-4">
+            {/* Vendors Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence mode="popLayout">
-                {filteredVendors.map(vendor => (
-                  <motion.div
-                    key={vendor.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:shadow-md transition-shadow group"
-                  >
-                    <div className="flex items-center gap-5 rtl:flex-row-reverse">
-                      <div className="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center border border-slate-100 shrink-0">
-                        {vendor.logoUrl ? (
-                          <img src={vendor.logoUrl} alt={vendor.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Store className="w-8 h-8 text-slate-300" />
-                        )}
-                      </div>
-                      <div className="rtl:text-right">
-                        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 rtl:flex-row-reverse">
-                          {vendor.name}
-                          {vendor.plan === 'enterprise' && <Crown className="w-4 h-4 text-amber-500" />}
-                        </h3>
-                        <div className="flex items-center gap-3 mt-1 rtl:flex-row-reverse">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/{vendor.slug}</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-200" />
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {language === 'ar' ? 'انضم' : 'Joined'} {format(new Date(vendor.createdAt), 'MMM yyyy')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                {filteredVendors.map(vendor => {
+                  const planName = vendor.plan || 'starter';
+                  const cleanPhone = vendor.phone?.replace(/[^\d+]/g, '') || '';
 
-                    <div className="flex flex-wrap items-center gap-4 rtl:flex-row-reverse">
-                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-3 rtl:flex-row-reverse">
-                        <div className={`p-2 rounded-lg ${
-                          vendor.plan === 'enterprise' ? 'bg-amber-100 text-amber-600' :
-                          vendor.plan === 'pro' ? 'bg-indigo-100 text-indigo-600' :
-                          'bg-slate-200 text-slate-500'
+                  return (
+                    <motion.div
+                      key={vendor.id}
+                      layout
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="bg-white rounded-[2.5rem] border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+                    >
+                      {/* Top Banner & Header */}
+                      <div>
+                        <div className={`h-24 w-full relative overflow-hidden ${
+                          planName === 'enterprise'
+                            ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700'
+                            : planName === 'pro'
+                            ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700'
+                            : 'bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900'
                         }`}>
-                          {vendor.plan === 'enterprise' ? <Crown className="w-4 h-4" /> : 
-                           vendor.plan === 'pro' ? <Zap className="w-4 h-4" /> : 
-                           <Store className="w-4 h-4" />}
+                          {vendor.bannerUrl ? (
+                            <img src={vendor.bannerUrl} alt="" className="w-full h-full object-cover opacity-40" />
+                          ) : (
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent" />
+                          )}
+                          
+                          {/* Badge for visibility & Store link */}
+                          <div className="absolute top-3 right-3 left-3 flex justify-between items-center rtl:flex-row-reverse z-10">
+                            <button
+                              onClick={() => toggleVendorVisibility(vendor.id, vendor.isPublic !== false)}
+                              className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-wider transition-all flex items-center gap-1.5 shadow-sm backdrop-blur-md ${
+                                vendor.isPublic !== false
+                                  ? 'bg-emerald-500/90 text-white hover:bg-emerald-600'
+                                  : 'bg-slate-900/80 text-slate-300 hover:bg-slate-900'
+                              }`}
+                              title={vendor.isPublic !== false ? (language === 'ar' ? 'إخفاء من الرئيسية' : 'Hide') : (language === 'ar' ? 'إظهار في الرئيسية' : 'Show')}
+                            >
+                              {vendor.isPublic !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              <span>{vendor.isPublic !== false ? (language === 'ar' ? 'منشور' : 'Public') : (language === 'ar' ? 'مخفي' : 'Private')}</span>
+                            </button>
+
+                            <a
+                              href={`/store/${vendor.slug}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full backdrop-blur-md transition-all active:scale-95"
+                              title={language === 'ar' ? 'معاينة المتجر' : 'View Store'}
+                            >
+                              <ArrowUpRight className="w-4 h-4" />
+                            </a>
+                          </div>
                         </div>
-                        <div className="rtl:text-right pr-2">
-                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'الباقة الحالية' : 'Current Plan'}</p>
-                          <p className="text-sm font-black text-slate-700 capitalize">{vendor.plan || 'Starter'}</p>
+
+                        {/* Store Profile Info Header */}
+                        <div className="px-6 pb-4 pt-0 relative">
+                          <div className="flex items-end justify-between -mt-10 mb-3 rtl:flex-row-reverse">
+                            <div className="w-18 h-18 bg-white rounded-2xl overflow-hidden p-1.5 border-2 border-white shadow-md shrink-0">
+                              <div className="w-full h-full bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center">
+                                {vendor.logoUrl ? (
+                                  <img src={vendor.logoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Store className="w-8 h-8 text-slate-400" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Subscription Plan Badge */}
+                            <div className={`px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
+                              planName === 'enterprise'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : planName === 'pro'
+                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {planName === 'enterprise' ? <Crown className="w-3.5 h-3.5 text-amber-600" /> :
+                               planName === 'pro' ? <Zap className="w-3.5 h-3.5 text-indigo-600" /> :
+                               <Store className="w-3.5 h-3.5 text-slate-500" />}
+                              <span>{planName}</span>
+                            </div>
+                          </div>
+
+                          {/* Vendor Title & Slug */}
+                          <div className="rtl:text-right">
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 rtl:flex-row-reverse">
+                              {vendor.name}
+                              {planName === 'enterprise' && <Crown className="w-4 h-4 text-amber-500 shrink-0" />}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 mt-0.5">
+                              /{vendor.slug}
+                            </p>
+                          </div>
+
+                          {/* Details List */}
+                          <div className="mt-5 space-y-2.5 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-600">
+                            
+                            {/* Phone Number & WhatsApp Button */}
+                            <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl rtl:flex-row-reverse">
+                              <div className="flex items-center gap-2 rtl:flex-row-reverse text-slate-700">
+                                <Phone className="w-4 h-4 text-indigo-600 shrink-0" />
+                                <span className="font-bold dir-ltr">{vendor.phone || (language === 'ar' ? 'غير مسجل' : 'N/A')}</span>
+                              </div>
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/${cleanPhone}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1 bg-emerald-500 text-white rounded-lg text-[10px] font-extrabold flex items-center gap-1 hover:bg-emerald-600 transition-colors"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                  <span>{language === 'ar' ? 'واتساب' : 'WhatsApp'}</span>
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Owner Name */}
+                            {(vendor.ownerName || vendor.bankAccountName) && (
+                              <div className="flex items-center gap-2.5 px-1 rtl:flex-row-reverse">
+                                <User className="w-4 h-4 text-slate-400 shrink-0" />
+                                <span className="text-slate-500">{language === 'ar' ? 'صاحب الحساب:' : 'Owner:'}</span>
+                                <span className="font-bold text-slate-800">{vendor.ownerName || vendor.bankAccountName}</span>
+                              </div>
+                            )}
+
+                            {/* Location / Region */}
+                            <div className="flex items-center gap-2.5 px-1 rtl:flex-row-reverse">
+                              <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span className="text-slate-500">{language === 'ar' ? 'المنطقة:' : 'Region:'}</span>
+                              <span className="font-bold text-slate-800">
+                                {vendor.pickupRegion || vendor.city || vendor.location || (language === 'ar' ? 'البحرين' : 'Bahrain')}
+                              </span>
+                            </div>
+
+                            {/* Bank Name & IBAN */}
+                            <div className="bg-slate-50 p-2.5 rounded-xl space-y-1 rtl:text-right">
+                              <div className="flex items-center gap-2 rtl:flex-row-reverse text-slate-500 text-[11px]">
+                                <Landmark className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                <span>{vendor.bankName || (language === 'ar' ? 'البنك غير محدد' : 'Bank not specified')}</span>
+                              </div>
+                              <div className="font-mono font-bold text-slate-800 text-[11px] dir-ltr text-left overflow-x-auto truncate">
+                                {vendor.iban || (language === 'ar' ? 'آيبان غير مضاف' : 'IBAN not set')}
+                              </div>
+                            </div>
+
+                            {/* Instagram if available */}
+                            {vendor.instagram && (
+                              <div className="flex items-center gap-2.5 px-1 rtl:flex-row-reverse">
+                                <Instagram className="w-4 h-4 text-rose-500 shrink-0" />
+                                <span className="text-slate-500">Instagram:</span>
+                                <a
+                                  href={`https://instagram.com/${vendor.instagram.replace('@', '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-bold text-indigo-600 hover:underline"
+                                >
+                                  @{vendor.instagram.replace('@', '')}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* AI Credits & Created Date */}
+                            <div className="flex items-center justify-between px-1 pt-1 text-[11px] text-slate-400 rtl:flex-row-reverse border-t border-slate-100/60">
+                              <div className="flex items-center gap-1 rtl:flex-row-reverse">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                <span>{vendor.aiCredits || 0} {language === 'ar' ? 'رصيد الذكاء' : 'AI Credits'}</span>
+                              </div>
+                              <div className="flex items-center gap-1 rtl:flex-row-reverse">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{format(new Date(vendor.createdAt), 'dd MMM yyyy')}</span>
+                              </div>
+                            </div>
+
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 rtl:flex-row-reverse">
-                        <button
-                          onClick={() => toggleVendorVisibility(vendor.id, vendor.isPublic !== false)}
-                          className={`p-3 rounded-2xl transition-all flex items-center gap-2 ${
-                            vendor.isPublic !== false 
-                            ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100' 
-                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-slate-200'
-                          }`}
-                          title={vendor.isPublic !== false ? (language === 'ar' ? 'إخفاء من الرئيسية' : 'Hide from Home') : (language === 'ar' ? 'إظهار في الرئيسية' : 'Show on Home')}
-                        >
-                          {vendor.isPublic !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                          <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
-                            {vendor.isPublic !== false ? (language === 'ar' ? 'منشور' : 'Public') : (language === 'ar' ? 'مخفي' : 'Private')}
-                          </span>
-                        </button>
-
-                        {(['starter', 'pro', 'enterprise'] as SubscriptionPlan[]).map(p => (
-                          <button
-                            key={p}
-                            onClick={() => updateVendorPlan(vendor.id, p)}
-                            disabled={vendor.plan === p}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                              vendor.plan === p 
-                              ? 'bg-slate-100 text-slate-400 cursor-default' 
-                              : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-600 hover:text-indigo-600'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
+                      {/* Card Footer: Change Plan Controls */}
+                      <div className="p-4 bg-slate-50/80 border-t border-slate-100 rounded-b-[2.5rem] mt-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">
+                          {language === 'ar' ? 'ترقية / تغيير باقة التاجر' : 'Upgrade / Change Vendor Plan'}
+                        </p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(['starter', 'pro', 'enterprise'] as SubscriptionPlan[]).map(p => (
+                            <button
+                              key={p}
+                              onClick={() => updateVendorPlan(vendor.id, p)}
+                              disabled={planName === p}
+                              className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 ${
+                                planName === p
+                                  ? p === 'enterprise' ? 'bg-amber-500 text-white shadow-sm' :
+                                    p === 'pro' ? 'bg-indigo-600 text-white shadow-sm' :
+                                    'bg-slate-800 text-white shadow-sm'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'
+                              }`}
+                            >
+                              <span className="capitalize">{p}</span>
+                              {planName === p && (
+                                <span className="text-[8px] opacity-80">{language === 'ar' ? '(الحالية)' : '(Current)'}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-
-                      <a 
-                        href={`/store/${vendor.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors"
-                      >
-                        <ArrowUpRight className="w-5 h-5" />
-                      </a>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
+            </div>
 
               {filteredVendors.length === 0 && (
                 <div className="py-20 text-center bg-white rounded-[2rem] border border-dashed border-slate-200">
@@ -480,8 +661,168 @@ export default function AdminDashboard() {
                   <p className="font-bold text-slate-400">{language === 'ar' ? 'لم يتم العثور على نتائج' : 'No results found'}</p>
                 </div>
               )}
-            </div>
           </>
+        )}
+
+        {activeTab === 'payment_settings' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Form Column */}
+            <form onSubmit={handleSavePaymentSettings} className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+              <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4 rtl:flex-row-reverse">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div className="rtl:text-right">
+                  <h2 className="text-xl font-black text-slate-800">
+                    {language === 'ar' ? 'تعديل بيانات الحساب للدفع' : 'Edit Payment Account Details'}
+                  </h2>
+                  <p className="text-xs text-slate-400 font-semibold mt-1">
+                    {language === 'ar' ? 'تحديث رقم بنفت بي، الآيبان، واسم البنك الظاهر للتجار عند الشحن والترقية' : 'Update BenefitPay, IBAN, and Bank info displayed to vendors during checkout'}
+                  </p>
+                </div>
+              </div>
+
+              {paymentSettingsSuccess && (
+                <div className="p-4 bg-emerald-50 text-emerald-800 rounded-2xl border border-emerald-100 flex items-center gap-3 rtl:flex-row-reverse">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <p className="text-xs font-bold rtl:text-right">
+                    {language === 'ar' ? 'تم حفظ بيانات الحساب البنكي للدفع ونشرها للتجار بنجاح!' : 'Payment bank account details saved and updated successfully!'}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2 text-right rtl:text-right">
+                    {language === 'ar' ? 'رقم بنفت بي (BenefitPay Number)' : 'BenefitPay Mobile Number'}
+                  </label>
+                  <div className="relative flex items-center">
+                    <Phone className="absolute left-4 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={benefitPayPhone}
+                      onChange={e => setBenefitPayPhone(e.target.value)}
+                      placeholder="e.g. 36368522"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all font-semibold text-sm text-left"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2 text-right rtl:text-right">
+                    {language === 'ar' ? 'اسم المستلم / صاحب الحساب' : 'Account Holder Name'}
+                  </label>
+                  <div className="relative flex items-center">
+                    <Users className="absolute left-4 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={accountHolder}
+                      onChange={e => setAccountHolder(e.target.value)}
+                      placeholder="e.g. Mursal Al-Bakery / Curbside GCC"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all font-semibold text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2 text-right rtl:text-right">
+                    {language === 'ar' ? 'اسم بنك المستلم' : 'Receiver Bank Name'}
+                  </label>
+                  <div className="relative flex items-center">
+                    <Landmark className="absolute left-4 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      placeholder="e.g. Al Salam Bank (بنك السلام)"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all font-semibold text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2 text-right rtl:text-right">
+                    {language === 'ar' ? 'رقم الآيبان (IBAN)' : 'IBAN Number'}
+                  </label>
+                  <div className="relative flex items-center">
+                    <CreditCard className="absolute left-4 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={iban}
+                      onChange={e => setIban(e.target.value)}
+                      placeholder="e.g. BH25 ALSL 0000 3636 8522 0001"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all font-mono font-semibold text-sm text-left"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingPaymentSettings}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-600 text-white rounded-2xl font-extrabold text-sm shadow-md shadow-emerald-100 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {savingPaymentSettings ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>{language === 'ar' ? 'حفظ ونشر بيانات الدفع' : 'Save & Update Payment Details'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Preview Column */}
+            <div className="lg:col-span-5 space-y-4">
+              <h3 className={`text-xs font-black text-slate-400 uppercase tracking-widest ${isRTL ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'معاينة شاشة التحويل للتجار' : 'Preview Vendor Payment Screen'}
+              </h3>
+              
+              <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-2 rtl:flex-row-reverse">
+                  <span className="w-3 h-3 rounded-full bg-rose-400" />
+                  <span className="w-3 h-3 rounded-full bg-amber-400" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] font-black text-slate-300 ml-2">{language === 'ar' ? 'شاشة تحويل الباقة' : 'Vendor Payment Screen'}</span>
+                </div>
+
+                <div className="bg-amber-50/50 border border-amber-100 p-3.5 rounded-2xl text-amber-900 font-semibold text-xs leading-relaxed rtl:text-right">
+                  {language === 'ar' 
+                    ? 'يرجى تحويل مبلغ الباقة لحساب بنفت بي أو الحساب البنكي الموضح بالأسفل، ثم إرفاق لقطة شاشة لإيصال التحويل لإتمام العملية.'
+                    : 'Please transfer the package price to the BenefitPay number or Bank Account below, then upload your transaction screenshot.'}
+                </div>
+
+                {/* Live Card Preview */}
+                <div className="bg-slate-50 p-4 border border-slate-200/70 rounded-2xl space-y-3 font-medium text-xs text-slate-700">
+                  <div className="flex justify-between items-center rtl:flex-row-reverse">
+                    <span className="text-slate-400">{language === 'ar' ? 'رقم بنفت بي:' : 'BenefitPay Mobile:'}</span>
+                    <span className="font-bold text-slate-900">{benefitPayPhone || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center rtl:flex-row-reverse">
+                    <span className="text-slate-400">{language === 'ar' ? 'اسم المستلم:' : 'Account Holder:'}</span>
+                    <span className="font-bold text-slate-900">{accountHolder || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-center rtl:flex-row-reverse">
+                    <span className="text-slate-400">{language === 'ar' ? 'بنك المستلم:' : 'Receiver Bank:'}</span>
+                    <span className="font-bold text-slate-900">{bankName || '---'}</span>
+                  </div>
+                  <div className="flex justify-between items-start rtl:flex-row-reverse">
+                    <span className="text-slate-400 shrink-0">{language === 'ar' ? 'رقم الآيبان (IBAN):' : 'IBAN:'}</span>
+                    <span className="font-mono font-bold text-slate-900 text-right max-w-[200px] break-all leading-tight">
+                      {iban || '---'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'contact_settings' && (

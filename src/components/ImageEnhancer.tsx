@@ -46,6 +46,7 @@ interface ImageEnhancerProps {
   onImageSaved: (url: string) => void;
   onClose: () => void;
   onCreditsUpdated?: (nextCredits: number) => void;
+  onOpenUpgrade?: () => void;
 }
 
 type BackgroundTheme = "marble" | "wooden" | "minimalist" | "outdoor";
@@ -56,7 +57,8 @@ export default function ImageEnhancer({
   aiCredits,
   onImageSaved,
   onClose,
-  onCreditsUpdated
+  onCreditsUpdated,
+  onOpenUpgrade
 }: ImageEnhancerProps) {
   const { language, isRTL } = useLanguage();
   
@@ -80,18 +82,22 @@ export default function ImageEnhancer({
   const [isUpgradingLocal, setIsUpgradingLocal] = useState(false);
 
   const handleUpgradeFromEnhancer = async () => {
-    setIsUpgradingLocal(true);
-    try {
-      await updateDoc(doc(db, "vendors", vendorId), {
-        plan: "pro",
-        subscriptionStatus: "active",
-        subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      });
-      window.location.reload();
-    } catch (err) {
-      console.error("Upgrade error from enhancer:", err);
-    } finally {
-      setIsUpgradingLocal(false);
+    if (onOpenUpgrade) {
+      onOpenUpgrade();
+    } else {
+      setIsUpgradingLocal(true);
+      try {
+        await updateDoc(doc(db, "vendors", vendorId), {
+          plan: "pro",
+          subscriptionStatus: "active",
+          subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
+        window.location.reload();
+      } catch (err) {
+        console.error("Upgrade error from enhancer:", err);
+      } finally {
+        setIsUpgradingLocal(false);
+      }
     }
   };
 

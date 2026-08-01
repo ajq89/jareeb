@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import logoImg from '../assets/images/logo-text.png';
+import Logo from './Logo';
 
 export default function SplashScreen() {
   return (
@@ -35,11 +35,7 @@ export default function SplashScreen() {
           }}
           className="relative z-10 mb-12"
         >
-          <img 
-            src={logoImg} 
-            alt="Jareeb - جريب" 
-            className="w-48 sm:w-64 h-auto object-contain drop-shadow-xl"
-          />
+          <Logo size="lg" showSubtext={true} />
         </motion.div>
 
         {/* Minimalist Progress Line */}

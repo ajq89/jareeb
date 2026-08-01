@@ -26,9 +26,10 @@ import { format } from 'date-fns';
 interface CustomersPanelProps {
   vendor: Vendor;
   orders: Order[];
+  onOpenUpgrade?: () => void;
 }
 
-export default function CustomersPanel({ vendor, orders }: CustomersPanelProps) {
+export default function CustomersPanel({ vendor, orders, onOpenUpgrade }: CustomersPanelProps) {
   const { language } = useLanguage();
   const isPro = vendor.plan === 'pro' || vendor.plan === 'enterprise';
   const [manualCustomers, setManualCustomers] = useState<Customer[]>([]);
@@ -72,12 +73,16 @@ export default function CustomersPanel({ vendor, orders }: CustomersPanelProps) 
 
   // Handle plan upgrade programmatically
   const handleUpgradeToPro = async () => {
-    try {
-      await updateDoc(doc(db, 'vendors', vendor.id), {
-        plan: 'pro'
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'vendors');
+    if (onOpenUpgrade) {
+      onOpenUpgrade();
+    } else {
+      try {
+        await updateDoc(doc(db, 'vendors', vendor.id), {
+          plan: 'pro'
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'vendors');
+      }
     }
   };
 

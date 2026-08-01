@@ -16,11 +16,21 @@ export default function Logo({
   showSubtext = false,
   className = ''
 }: LogoProps) {
-  const [imgError, setImgError] = useState(false);
+  const [retryIndex, setRetryIndex] = useState(0);
   const { language } = useLanguage();
 
   const isLight = variant === 'light';
-  const logoSrc = isLight ? logoLight : logoDark;
+
+  // Fallback sources sequence to guarantee image loads in all environments
+  const sources = [
+    isLight ? logoLight : logoDark,
+    isLight ? '/logo-light.png' : '/logo-dark.png',
+    '/logo-text.png',
+    '/logo.png'
+  ];
+
+  const currentSrc = sources[Math.min(retryIndex, sources.length - 1)];
+  const isFailedAll = retryIndex >= sources.length;
 
   const sizeClasses = {
     sm: 'h-8 sm:h-9',
@@ -33,11 +43,12 @@ export default function Logo({
 
   return (
     <div className={`inline-flex flex-col items-center justify-center ${className}`}>
-      {!imgError ? (
+      {!isFailedAll ? (
         <img
-          src={logoSrc}
+          key={currentSrc}
+          src={currentSrc}
           alt="Jareeb - جريب"
-          onError={() => setImgError(true)}
+          onError={() => setRetryIndex(prev => prev + 1)}
           className={`${sizeClasses} w-auto object-contain transition-transform duration-300 hover:scale-105 filter drop-shadow-sm`}
         />
       ) : (
